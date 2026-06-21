@@ -584,15 +584,94 @@ function guardarPago() {
 }
 
 // ===================== GASTOS COMUNES =====================
+const GASTOS_JULIO_2026 = [
+  {unidad:'1',residente:'Viviana Navarro',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:33000,intereses:0,abonos:0,totalCobrado:55000,saldoFavor:0},
+  {unidad:'2',residente:'Elena Maturana Toro Maturana',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44000,intereses:0,abonos:0,totalCobrado:66000,saldoFavor:0},
+  {unidad:'3',residente:'Paola Alejandra Manzano Villalón',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44000,intereses:0,abonos:0,totalCobrado:66000,saldoFavor:0},
+  {unidad:'4',residente:'Mauricio Jorge Saavedra Sandoval',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'5',residente:'Viviana Andrea Calderón Salinas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:66000,intereses:0,abonos:0,totalCobrado:88000,saldoFavor:0},
+  {unidad:'6',residente:'Eduardo Arancibia Plaza',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:31847,intereses:208,abonos:0,totalCobrado:54055,saldoFavor:0},
+  {unidad:'7',residente:'Jimena Pizarro',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:26,intereses:0,abonos:0,totalCobrado:22026,saldoFavor:0},
+  {unidad:'8',residente:'Gonzalo Saavedra',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'9',residente:'Laura Valeska Ordenes Castillo',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'10',residente:'Betsabe Ester Pizarro Tapia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:37886,intereses:336,abonos:0,totalCobrado:60222,saldoFavor:0},
+  {unidad:'11',residente:'Antonia Albornoz Vargas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'12',residente:'Yessica Devía Olivares',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'13',residente:'Valery Ossandon Jara',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'14',residente:'Robín Williams Zalazar Zamora',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'15',residente:'Nicole Estefanía Reyes Rozas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22082,intereses:2,abonos:0,totalCobrado:44084,saldoFavor:0},
+  {unidad:'16',residente:'Celia María Escobar López',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'17',residente:'Roberto Román',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'18',residente:'Guillermo Maturana',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44996,intereses:465,abonos:0,totalCobrado:67461,saldoFavor:0},
+  {unidad:'19',residente:'Marisel Mercedes Rivera Villalobos',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'20',residente:'Saira Estrella Díaz Cisterna',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'21',residente:'Alejandra Andrea Mena Silva',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'22',residente:'Priscila Antonia Esquivel Ordenes',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:126923,intereses:0,abonos:0,totalCobrado:148923,saldoFavor:0},
+  {unidad:'23',residente:'Esteban Andrés Tapia Valencia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44000,intereses:0,abonos:0,totalCobrado:66000,saldoFavor:0},
+  {unidad:'24',residente:'Nelson Abraham Álvarez Borquez',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:108000,intereses:0,abonos:0,totalCobrado:130000,saldoFavor:0},
+  {unidad:'25',residente:'Cristian Rivera Gajardo',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'26',residente:'Carlos Castillo Rodríguez',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:45461,intereses:496,abonos:0,totalCobrado:67957,saldoFavor:0},
+  {unidad:'27',residente:'Luz Marina Miranda Allende',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'28',residente:'José Luis Jamett Carrasco',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:21306,intereses:0,abonos:0,totalCobrado:43306,saldoFavor:0},
+  {unidad:'29',residente:'Rodrigo Fernandez Briceño',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'30',residente:'Carolina Morales Arancibia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22650,intereses:10,abonos:0,totalCobrado:44660,saldoFavor:0},
+  {unidad:'31',residente:'Aníbal Aros Godoy',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'32',residente:'Jessica Fortunato Berrios',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'33',residente:'Sandra Salinas Soto',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:121,intereses:0,abonos:0,totalCobrado:22121,saldoFavor:0},
+  {unidad:'34',residente:'Yosmaira',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:23981,intereses:33,abonos:0,totalCobrado:46014,saldoFavor:0},
+  {unidad:'35',residente:'Francisco Javier Collao Blanca',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:17598,intereses:0,abonos:0,totalCobrado:39598,saldoFavor:0},
+  {unidad:'36',residente:'Fernando Delgadillo Bruna',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'37',residente:'Rebeca Noemí Salazar Araya',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'38',residente:'Jusep Andrea Burgos Vargas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'39',residente:'Jose Luis Ortiz Estay',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:65082,intereses:879,abonos:0,totalCobrado:87961,saldoFavor:0},
+  {unidad:'40',residente:'Gerardo Manuel Torres Ceballos',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'41',residente:'Denisse Pimentel',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:48340,intereses:548,abonos:0,totalCobrado:70888,saldoFavor:0},
+  {unidad:'42',residente:'Carla Hansen Baeza',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:21068,intereses:0,abonos:0,totalCobrado:43068,saldoFavor:0},
+  {unidad:'43',residente:'Marco Heraldo Díaz Villegas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:42,intereses:0,abonos:0,totalCobrado:22042,saldoFavor:0},
+  {unidad:'44',residente:'Luis Gabriel Robles Otarola',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22052,intereses:27,abonos:0,totalCobrado:44079,saldoFavor:0},
+  {unidad:'45',residente:'Luis Cordova',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:727553,intereses:9901,abonos:0,totalCobrado:759454,saldoFavor:0},
+  {unidad:'46',residente:'Katherin Rosa Tapia Tapia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'47',residente:'Diego Cataldo',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'48',residente:'Jolibert Jannette Larez Torrealba',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'49',residente:'Romina Araceli Choque Brito',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'50',residente:'Alejandro Ramírez Zarricueta',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
+  {unidad:'51',residente:'Yeison Ramírez Zarricueta',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:24675,intereses:0,abonos:0,totalCobrado:46675,saldoFavor:0},
+  {unidad:'52',residente:'Corredora',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:22000,totalCobrado:0,saldoFavor:47719},
+  {unidad:'53',residente:'José Domingo Tapia Figueroa',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:27,abonos:839,totalCobrado:21188,saldoFavor:0},
+  {unidad:'54',residente:'Andrea Lombardo Morales',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'55',residente:'Katherine Villarreal',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22135,intereses:0,abonos:0,totalCobrado:44135,saldoFavor:0},
+  {unidad:'56',residente:'Natalia Andrea Álvarez Carroza',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'57',residente:'Ignacia Cisternas Riveros',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22221,intereses:5,abonos:0,totalCobrado:44226,saldoFavor:0},
+  {unidad:'58',residente:'David Marco Cortes García',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
+  {unidad:'115',residente:'Marilyn Ramírez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'117',residente:'Yimi Bahamondes Olmos',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:30000,intereses:0,abonos:0,totalCobrado:36000,saldoFavor:0},
+  {unidad:'119',residente:'Yosselyn Cataldo Ponce',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'121',residente:'Johana Jaime',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:36000,intereses:0,abonos:0,totalCobrado:42000,saldoFavor:0},
+  {unidad:'123',residente:'Christian Jovanny Pino Morales',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'125',residente:'Eduardo Carreño',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:64095,intereses:0,abonos:0,totalCobrado:70095,saldoFavor:0},
+  {unidad:'127',residente:'Karen Daniela Salzmann Saavedra',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'129',residente:'David Eric Aguilera Núñez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'131',residente:'Edith Robles',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'133',residente:'Luis García Álvarez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'135',residente:'Carlos Diaz Frez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:967712,intereses:9464,abonos:0,totalCobrado:983176,saldoFavor:0},
+  {unidad:'137',residente:'Luis Bustamante Aranguiz',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'139',residente:'Jordán Francisco Flores Maturana',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:977712,intereses:9464,abonos:0,totalCobrado:993176,saldoFavor:0},
+  {unidad:'141',residente:'Sin usuario a cargo',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'143',residente:'Alejandro Rojas Huerta',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'145',residente:'Nicolás Cordero Lorenzi',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
+  {unidad:'280',residente:'Ricardo Huerta Zepeda',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:12000,intereses:0,abonos:0,totalCobrado:18000,saldoFavor:0},
+];
+
 function mostrarGastos() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
       <button class="btn btn-verde" onclick="abrirModalGasto()">+ Nuevo gasto común</button>
     </div>
     <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Gastos comunes emitidos</h3></div>
-      <div id="lista-gastos"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
+      <div class="tabla-header"><h3>Gastos comunes — Julio 2026</h3><span style="font-size:12px;color:var(--texto2)">75 unidades · Cargados desde planilla oficial</span></div>
+      <div id="lista-gastos"></div>
     </div>
     <div id="modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center">
       <div style="background:white;border-radius:16px;padding:28px;width:400px;max-width:90vw">
@@ -609,7 +688,56 @@ function mostrarGastos() {
         </div>
       </div>
     </div>`;
-  cargarGastos();
+  renderGastosTabla();
+}
+
+function renderGastosTabla() {
+  let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
+    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>GC Egresos</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th>
+  </tr></thead><tbody>`;
+  GASTOS_JULIO_2026.forEach(g => {
+    const deudaTotal = g.capitalAtrasado + g.intereses;
+    const rowColor = deudaTotal > 66000 ? '#fff5f5' : g.saldoFavor > 0 ? '#f0fdf4' : '';
+    html += `<tr style="background:${rowColor}">
+      <td><strong>${g.unidad}</strong></td>
+      <td>${g.residente}</td>
+      <td style="text-align:right">$${g.prorrateo.toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${g.gcEgresos.toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${g.totalMes.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.capitalAtrasado>0?'color:#dc2626;font-weight:600':''}">$${g.capitalAtrasado.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.intereses>0?'color:#f97316':''}">$${g.intereses.toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${g.abonos.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;font-weight:600">$${g.totalCobrado.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.saldoFavor>0?'color:#16a34a;font-weight:600':''}">$${g.saldoFavor.toLocaleString('es-CL')}</td>
+    </tr>`;
+  });
+  const totProrrateo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.prorrateo,0);
+  const totCapital = GASTOS_JULIO_2026.reduce((s,g)=>s+g.capitalAtrasado,0);
+  const totIntereses = GASTOS_JULIO_2026.reduce((s,g)=>s+g.intereses,0);
+  const totCobrado = GASTOS_JULIO_2026.reduce((s,g)=>s+g.totalCobrado,0);
+  const totSaldo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.saldoFavor,0);
+  html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700">
+    <td colspan="2">TOTALES</td>
+    <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
+    <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
+    <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
+    <td style="text-align:right;color:#dc2626">$${totCapital.toLocaleString('es-CL')}</td>
+    <td style="text-align:right;color:#f97316">$${totIntereses.toLocaleString('es-CL')}</td>
+    <td style="text-align:right">$0</td>
+    <td style="text-align:right">$${totCobrado.toLocaleString('es-CL')}</td>
+    <td style="text-align:right;color:#16a34a">$${totSaldo.toLocaleString('es-CL')}</td>
+  </tr></tfoot></table></div>`;
+  document.getElementById('lista-gastos').innerHTML = html;
+}
+
+function exportarGastosExcel() {
+  let csv = 'Unidad,Residente,Prorrateo,GC Egresos,Total Mes,Capital Atrasado,Intereses,Abonos,Total Cobrado,Saldo Favor\n';
+  GASTOS_JULIO_2026.forEach(g => {
+    csv += `${g.unidad},"${g.residente}",${g.prorrateo},${g.gcEgresos},${g.totalMes},${g.capitalAtrasado},${g.intereses},${g.abonos},${g.totalCobrado},${g.saldoFavor}\n`;
+  });
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='Gastos_Comunes_Julio_2026.csv'; a.click();
 }
 
 function cargarGastos() {
@@ -665,7 +793,7 @@ function mostrarEgresos() {
           <input id="e-proveedor" placeholder="Proveedor / empresa" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <input id="e-monto" placeholder="Monto ($)" type="number" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="e-forma" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-            <option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Débito</option>
+            <option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Débito</option><option>Ajuste/Compensación</option>
           </select>
           <input id="e-documento" placeholder="N° factura / boleta (opcional)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
         </div>
@@ -1026,18 +1154,36 @@ function mostrarLibroDiario() {
 function cargarAsientos() {
   db.collection('libro_diario').orderBy('fecha','desc').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-asientos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay asientos registrados</div>'; return; }
-    let html = '<table><thead><tr><th>N°</th><th>Fecha</th><th>Glosa</th><th>Cuenta Debe</th><th>Debe</th><th>Cuenta Haber</th><th>Haber</th><th>Doc.</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>N°</th><th>Fecha</th><th>Glosa</th><th>Cuenta Debe</th><th>Debe</th><th>Cuenta Haber</th><th>Haber</th><th>Doc.</th><th>Acciones</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const a = d.data();
-      html += `<tr><td>${a.numero||'—'}</td><td>${a.fecha||'—'}</td><td>${a.glosa||'—'}</td><td>${a.cuentaDebe||'—'}</td><td style="text-align:right">$${Number(a.montoDebe||0).toLocaleString('es-CL')}</td><td>${a.cuentaHaber||'—'}</td><td style="text-align:right">$${Number(a.montoHaber||0).toLocaleString('es-CL')}</td><td>${a.documento||'—'}</td></tr>`;
+      const a = d.data(); const id = d.id;
+      html += `<tr><td>${a.numero||'—'}</td><td>${a.fecha||'—'}</td><td>${a.glosa||'—'}</td><td>${a.cuentaDebe||'—'}</td><td style="text-align:right">$${Number(a.montoDebe||0).toLocaleString('es-CL')}</td><td>${a.cuentaHaber||'—'}</td><td style="text-align:right">$${Number(a.montoHaber||0).toLocaleString('es-CL')}</td><td>${a.documento||'—'}</td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" style="background:#2563eb;color:white;font-size:11px;padding:4px 8px;margin-right:4px" onclick="editarAsiento('${id}',${JSON.stringify(a).replace(/'/g,"&#39;")})">✏️</button><button class="btn btn-sm" style="background:#dc2626;color:white;font-size:11px;padding:4px 8px" onclick="eliminarAsiento('${id}')">🗑️</button></td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('lista-asientos').innerHTML = html;
   }).catch(() => { document.getElementById('lista-asientos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Sin asientos aún</div>'; });
 }
 
-function abrirModalAsiento() { document.getElementById('modal-asiento').style.display='flex'; document.getElementById('a-fecha').value=new Date().toISOString().split('T')[0]; }
-function cerrarModalAsiento() { document.getElementById('modal-asiento').style.display='none'; }
+let _editAsientoId = null;
+function abrirModalAsiento() { _editAsientoId=null; document.getElementById('modal-asiento').style.display='flex'; document.getElementById('a-fecha').value=new Date().toISOString().split('T')[0]; document.getElementById('a-numero').value=''; document.getElementById('a-glosa').value=''; document.getElementById('a-cuenta-debe').value=''; document.getElementById('a-monto-debe').value=''; document.getElementById('a-cuenta-haber').value=''; document.getElementById('a-monto-haber').value=''; document.getElementById('a-documento').value=''; }
+function cerrarModalAsiento() { document.getElementById('modal-asiento').style.display='none'; _editAsientoId=null; }
+function editarAsiento(id, datos) {
+  _editAsientoId=id;
+  document.getElementById('a-fecha').value=datos.fecha||'';
+  document.getElementById('a-numero').value=datos.numero||'';
+  document.getElementById('a-glosa').value=datos.glosa||'';
+  document.getElementById('a-cuenta-debe').value=datos.cuentaDebe||'';
+  document.getElementById('a-monto-debe').value=datos.montoDebe||'';
+  document.getElementById('a-cuenta-haber').value=datos.cuentaHaber||'';
+  document.getElementById('a-monto-haber').value=datos.montoHaber||'';
+  document.getElementById('a-documento').value=datos.documento||'';
+  document.getElementById('modal-asiento').style.display='flex';
+}
+function eliminarAsiento(id) {
+  if(!confirm('¿Eliminar este asiento contable?')) return;
+  db.collection('libro_diario').doc(id).delete().then(()=>cargarAsientos()).catch(e=>alert('Error: '+e.message));
+}
 function guardarAsiento() {
   const datos = {
     fecha: document.getElementById('a-fecha').value,
@@ -1050,7 +1196,8 @@ function guardarAsiento() {
     documento: document.getElementById('a-documento').value,
   };
   if (!datos.glosa||!datos.montoDebe) { alert('Ingresa al menos la glosa y el monto'); return; }
-  db.collection('libro_diario').add(datos).then(()=>{ cerrarModalAsiento(); cargarAsientos(); }).catch(e=>alert('Error: '+e.message));
+  const op = _editAsientoId ? db.collection('libro_diario').doc(_editAsientoId).update(datos) : db.collection('libro_diario').add(datos);
+  op.then(()=>{ cerrarModalAsiento(); cargarAsientos(); }).catch(e=>alert('Error: '+e.message));
 }
 
 // ===================== CONCILIACIÓN =====================
@@ -1251,7 +1398,7 @@ function mostrarMorosos() {
       const total = deudaBase + (r.intereses||0);
       if (deudaBase >= MINIMO_DEUDA) morosos.push({...r, total});
     });
-    morosos.sort((a,b)=>b.total-a.total);
+    morosos.sort((a,b)=>a.total-b.total);
     document.getElementById('resumen-morosos').textContent = `· ${morosos.length} unidades`;
     if (morosos.length===0) { document.getElementById('lista-morosos').innerHTML='<div style="padding:24px;text-align:center;color:#999">🎉 No hay unidades con morosidad significativa</div>'; return; }
     const totalDeuda = morosos.reduce((s,r)=>s+r.total,0);
@@ -1546,6 +1693,7 @@ function mostrarCertificados() {
           <input id="cert-unidad" placeholder="N° unidad" oninput="buscarResidenteCert()" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <div id="cert-info" style="display:none;background:var(--verde3);border-radius:8px;padding:10px;font-size:13px;color:var(--verde4)"></div>
           <input id="cert-nombre" placeholder="Nombre (se llena automático)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="cert-rut" placeholder="RUT (se llena automático)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <input id="cert-fecha" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
@@ -1577,6 +1725,7 @@ function generarCertificado(tipo){
   document.getElementById('cert-fecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('cert-info').style.display='none';
   document.getElementById('cert-nombre').value='';
+  document.getElementById('cert-rut').value='';
   document.getElementById('cert-unidad').value='';
   document.getElementById('modal-cert').style.display='flex';
 }
@@ -2091,6 +2240,17 @@ function mostrarQuorum() {
           </div>
         </div>
 
+        <div style="margin-bottom:16px">
+          <label style="font-size:13px;font-weight:600;color:var(--verde4);display:block;margin-bottom:6px">Tipo de convocatoria</label>
+          <select id="q-llamado" onchange="calcularQuorum()" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="1">Primer llamado</option>
+            <option value="2">Segundo llamado (asistentes toman acuerdos)</option>
+          </select>
+        </div>
+        <div id="q-aviso-segundo" style="display:none;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px;font-size:12px;color:#713f12;margin-bottom:12px">
+          ⚠️ <strong>Segundo llamado:</strong> La asamblea se realiza con los copropietarios presentes, independiente del número. Los acuerdos se toman por mayoría de los asistentes.
+        </div>
+
         <div style="background:#f4f6f4;border-radius:12px;padding:20px;margin-bottom:20px">
           <p style="font-weight:600;color:var(--verde4);margin-bottom:16px;font-size:14px">Tipos de quórum según Ley 21.442:</p>
           <div style="display:grid;gap:10px">
@@ -2126,49 +2286,63 @@ function calcularQuorum() {
   const total = parseInt(document.getElementById('q-input-total').value)||75;
   const presentes = parseInt(document.getElementById('q-input-presentes').value)||0;
   const pct = total > 0 ? Math.round((presentes/total)*100) : 0;
+  const llamado = document.getElementById('q-llamado') ? document.getElementById('q-llamado').value : '1';
+  const esSegundoLlamado = llamado === '2';
 
   document.getElementById('q-total-unidades').textContent = total;
   document.getElementById('q-presentes').textContent = presentes;
   document.getElementById('q-porcentaje').textContent = pct + '%';
+  if(document.getElementById('q-aviso-segundo')) document.getElementById('q-aviso-segundo').style.display = esSegundoLlamado ? 'block' : 'none';
 
-  const simple = Math.ceil(total/2) + 1;
-  const absoluta = Math.ceil(total*2/3);
-  const calificada = Math.ceil(total*3/4);
-  const unanimidad = total;
+  // En segundo llamado los quórums se calculan sobre los presentes
+  const base = esSegundoLlamado ? presentes : total;
+  const simple = esSegundoLlamado ? Math.ceil(presentes/2)+1 : Math.ceil(total/2)+1;
+  const absoluta = esSegundoLlamado ? Math.ceil(presentes*2/3) : Math.ceil(total*2/3);
+  const calificada = esSegundoLlamado ? Math.ceil(presentes*3/4) : Math.ceil(total*3/4);
+  const unanimidad = esSegundoLlamado ? presentes : total;
 
-  document.getElementById('q-necesita-simple').textContent = simple;
-  document.getElementById('q-necesita-absoluta').textContent = absoluta;
-  document.getElementById('q-necesita-calificada').textContent = calificada;
-  document.getElementById('q-necesita-unanimidad').textContent = unanimidad;
+  document.getElementById('q-necesita-simple').textContent = esSegundoLlamado ? `${simple} de ${presentes} presentes` : simple;
+  document.getElementById('q-necesita-absoluta').textContent = esSegundoLlamado ? `${absoluta} de ${presentes} presentes` : absoluta;
+  document.getElementById('q-necesita-calificada').textContent = esSegundoLlamado ? `${calificada} de ${presentes} presentes` : calificada;
+  document.getElementById('q-necesita-unanimidad').textContent = esSegundoLlamado ? `${unanimidad} de ${presentes} presentes` : unanimidad;
 
   const colorOk = '#dcfce7'; const colorNo = '#fee2e2'; const borderOk = '#16a34a'; const borderNo = '#dc2626';
-  document.getElementById('q-simple').style.background = presentes >= simple ? colorOk : colorNo;
-  document.getElementById('q-simple').style.borderColor = presentes >= simple ? borderOk : borderNo;
-  document.getElementById('q-absoluta').style.background = presentes >= absoluta ? colorOk : colorNo;
-  document.getElementById('q-absoluta').style.borderColor = presentes >= absoluta ? borderOk : borderNo;
-  document.getElementById('q-calificada').style.background = presentes >= calificada ? colorOk : colorNo;
-  document.getElementById('q-calificada').style.borderColor = presentes >= calificada ? borderOk : borderNo;
-  document.getElementById('q-unanimidad').style.background = presentes >= unanimidad ? colorOk : colorNo;
-  document.getElementById('q-unanimidad').style.borderColor = presentes >= unanimidad ? borderOk : borderNo;
+  // En segundo llamado con presentes > 0 todos los quórums se consideran alcanzables
+  const checkSimple = esSegundoLlamado ? (presentes > 0) : (presentes >= simple);
+  const checkAbsoluta = esSegundoLlamado ? (presentes > 0) : (presentes >= absoluta);
+  const checkCalificada = esSegundoLlamado ? (presentes > 0) : (presentes >= calificada);
+  const checkUnanimidad = esSegundoLlamado ? (presentes > 0) : (presentes >= unanimidad);
 
-  let estado = '❌ Sin quórum';
-  let estadoColor = '#dc2626';
-  if (presentes >= unanimidad) { estado = '✅ Quórum unánime'; estadoColor = '#16a34a'; }
-  else if (presentes >= calificada) { estado = '✅ Quórum calificado'; estadoColor = '#16a34a'; }
-  else if (presentes >= absoluta) { estado = '✅ Quórum absoluto'; estadoColor = '#16a34a'; }
-  else if (presentes >= simple) { estado = '✅ Quórum simple'; estadoColor = '#16a34a'; }
+  document.getElementById('q-simple').style.background = checkSimple ? colorOk : colorNo;
+  document.getElementById('q-simple').style.borderColor = checkSimple ? borderOk : borderNo;
+  document.getElementById('q-absoluta').style.background = checkAbsoluta ? colorOk : colorNo;
+  document.getElementById('q-absoluta').style.borderColor = checkAbsoluta ? borderOk : borderNo;
+  document.getElementById('q-calificada').style.background = checkCalificada ? colorOk : colorNo;
+  document.getElementById('q-calificada').style.borderColor = checkCalificada ? borderOk : borderNo;
+  document.getElementById('q-unanimidad').style.background = checkUnanimidad ? colorOk : colorNo;
+  document.getElementById('q-unanimidad').style.borderColor = checkUnanimidad ? borderOk : borderNo;
+
+  let estado = presentes === 0 ? '— Sin asistentes' : esSegundoLlamado ? '✅ Segundo llamado — válida' : '❌ Sin quórum';
+  let estadoColor = presentes === 0 ? '#999' : esSegundoLlamado ? '#16a34a' : '#dc2626';
+  if (!esSegundoLlamado) {
+    if (presentes >= total) { estado = '✅ Quórum unánime'; estadoColor = '#16a34a'; }
+    else if (presentes >= Math.ceil(total*3/4)) { estado = '✅ Quórum calificado'; estadoColor = '#16a34a'; }
+    else if (presentes >= Math.ceil(total*2/3)) { estado = '✅ Quórum absoluto'; estadoColor = '#16a34a'; }
+    else if (presentes >= Math.ceil(total/2)+1) { estado = '✅ Quórum simple'; estadoColor = '#16a34a'; }
+  }
   document.getElementById('q-resultado').textContent = estado;
   document.getElementById('q-resultado').style.color = estadoColor;
 
   if (presentes > 0) {
     const hoy = new Date().toLocaleDateString('es-CL');
     document.getElementById('q-resumen-asamblea').style.display = 'block';
-    document.getElementById('q-texto-acta').innerHTML = `En la asamblea de copropietarios del Condominio Las Araucarias, celebrada el día <strong>${hoy}</strong>, se registró la asistencia de <strong>${presentes} unidades</strong> de un total de <strong>${total}</strong>, lo que corresponde al <strong>${pct}%</strong> de participación.<br><br>
-    En consecuencia, se cuenta con quórum suficiente para:<br>
-    ${presentes >= simple ? '✅' : '❌'} Acuerdos de mayoría simple (50%+1) — mínimo ${simple} unidades<br>
-    ${presentes >= absoluta ? '✅' : '❌'} Acuerdos de mayoría absoluta (2/3) — mínimo ${absoluta} unidades<br>
-    ${presentes >= calificada ? '✅' : '❌'} Acuerdos de mayoría calificada (3/4) — mínimo ${calificada} unidades<br>
-    ${presentes >= unanimidad ? '✅' : '❌'} Acuerdos por unanimidad — mínimo ${unanimidad} unidades`;
+    const textoLlamado = esSegundoLlamado ? ' (<strong>segundo llamado</strong>, acuerdos se toman con asistentes presentes)' : '';
+    document.getElementById('q-texto-acta').innerHTML = `En la asamblea de copropietarios del Condominio Las Araucarias, celebrada el día <strong>${hoy}</strong>${textoLlamado}, se registró la asistencia de <strong>${presentes} unidades</strong> de un total de <strong>${total}</strong>, lo que corresponde al <strong>${pct}%</strong> de participación.<br><br>
+    ${esSegundoLlamado ? '✅ Asamblea válida en segundo llamado. Los acuerdos se adoptan por mayoría de los copropietarios presentes.' : `En consecuencia, se cuenta con quórum suficiente para:<br>
+    ${presentes >= Math.ceil(total/2)+1 ? '✅' : '❌'} Mayoría simple (50%+1) — mínimo ${Math.ceil(total/2)+1} unidades<br>
+    ${presentes >= Math.ceil(total*2/3) ? '✅' : '❌'} Mayoría absoluta (2/3) — mínimo ${Math.ceil(total*2/3)} unidades<br>
+    ${presentes >= Math.ceil(total*3/4) ? '✅' : '❌'} Mayoría calificada (3/4) — mínimo ${Math.ceil(total*3/4)} unidades<br>
+    ${presentes >= total ? '✅' : '❌'} Unanimidad — mínimo ${total} unidades`}`;
   }
 }
 
