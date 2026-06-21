@@ -891,6 +891,8 @@ function mostrarCartas() {
           <span style="font-weight:600;color:var(--verde4)">Vista previa</span>
           <div style="display:flex;gap:8px">
             <button class="btn btn-verde" onclick="imprimirCarta()">🖨️ Imprimir</button>
+            <button class="btn btn-outline" style="background:#1565C0;color:white;border:none" onclick="descargarPDFCarta()">📥 PDF</button>
+            <button class="btn btn-outline" style="background:#1B5E20;color:white;border:none" onclick="descargarWordCarta()">📝 Word</button>
             <button class="btn btn-outline" onclick="cerrarVisor()">Cerrar</button>
           </div>
         </div>
@@ -1087,7 +1089,21 @@ function imprimirCarta() {
   setTimeout(()=>v.print(),500);
 }
 
-function abrirModalEgreso() { document.getElementById('modal-egreso').style.display='flex'; }
+function descargarPDFCarta(){
+  const contenido=document.getElementById('contenido-carta').innerHTML;
+  const v=window.open('','_blank');
+  v.document.write(`<!DOCTYPE html><html><head><title>Carta Condominio Las Araucarias</title><style>body{font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:40px;max-width:750px;margin:0 auto}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc}@media print{body{padding:20px}}</style><script>window.onload=function(){window.print();}<\/script></head><body>${contenido}</body></html>`);
+  v.document.close();
+}
+function descargarWordCarta(){
+  const contenido=document.getElementById('contenido-carta').innerHTML;
+  const html=`<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Carta Araucarias</title></head><body style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:40px;max-width:750px;margin:0 auto">${contenido}</body></html>`;
+  const blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='Carta_Araucarias.doc';a.click();
+}
+
+ document.getElementById('modal-egreso').style.display='flex'; }
 function cerrarModalEgreso() { document.getElementById('modal-egreso').style.display='none'; }
 function guardarEgreso() {
   const datos = {
@@ -1708,6 +1724,8 @@ function mostrarCertificados() {
           <span style="font-weight:600;color:var(--verde4)">Certificado</span>
           <div style="display:flex;gap:8px">
             <button class="btn btn-verde" onclick="imprimirCert()">🖨️ Imprimir</button>
+            <button class="btn btn-outline" style="background:#1565C0;color:white;border:none" onclick="descargarPDFCert()">📥 PDF</button>
+            <button class="btn btn-outline" style="background:#1B5E20;color:white;border:none" onclick="descargarWordCert()">📝 Word</button>
             <button class="btn btn-outline" onclick="document.getElementById('visor-cert').style.display='none'">Cerrar</button>
           </div>
         </div>
@@ -1772,19 +1790,16 @@ function emitirCertificado(){
 
   const firmaCert=`
     <br><br>
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px">
-      <div style="text-align:center">
-        ${firmaImg}
-        <div style="border-top:1px solid #333;padding-top:6px;margin-top:4px;font-size:12px">
-          <strong>ELENA DEL CARMEN MATURANA TORO</strong><br>
-          Representante legal<br>
-          Condominio LAS ARAUCARIAS<br>
-          Rol Único Tributario 53.321.396-0
-        </div>
+    <div style="margin-top:40px;text-align:center">
+      ${firmaImg}
+      <div style="border-top:1px solid #333;padding-top:6px;margin-top:4px;font-size:12px;display:inline-block">
+        <strong>ELENA DEL CARMEN MATURANA TORO</strong><br>
+        Representante legal<br>
+        Condominio LAS ARAUCARIAS<br>
+        Rol Único Tributario 53.321.396-0
       </div>
-      <div style="text-align:center">
-        ${timbreHtml}
-      </div>
+      <br><br>
+      <img src="${TIMBRE_B64}" style="height:100px;width:auto;display:inline-block;margin-top:8px" alt="Timbre">
     </div>`;
 
   let cuerpo='';
@@ -1862,7 +1877,13 @@ function descargarPDFCert(){
   v.document.close();
 }
 
-// ===================== CONTROL DE ACCESO =====================
+function descargarWordCert(){
+  const contenido=document.getElementById('contenido-cert').innerHTML;
+  const html=`<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Certificado Las Araucarias</title></head><body style="font-family:Arial,sans-serif;font-size:13px;line-height:1.8;padding:50px;max-width:700px;margin:0 auto">${contenido}</body></html>`;
+  const blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='Certificado_AraucariasS.doc';a.click();
+}
 function mostrarAcceso() {
   const c = document.getElementById('content');
   c.innerHTML = `
@@ -2556,6 +2577,32 @@ function mostrarConciliacion() {
       <div class="card"><div class="card-icon">📥</div><div class="card-valor" id="conc-ingresos">$0</div><div class="card-label">Ingresos del mes</div></div>
       <div class="card"><div class="card-icon">📤</div><div class="card-valor" id="conc-egresos">$0</div><div class="card-label">Egresos del mes</div></div>
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="tabla-wrap" style="padding:16px">
+        <h4 style="margin:0 0 12px;color:var(--verde4)">💾 Saldos iniciales del período</h4>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="font-size:12px;font-weight:600">Saldo inicial banco ($)</label>
+          <input id="saldo-ini-banco" type="number" placeholder="0" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <label style="font-size:12px;font-weight:600">Saldo inicial caja ($)</label>
+          <input id="saldo-ini-caja" type="number" placeholder="0" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <button class="btn btn-verde" onclick="guardarSaldosIniciales()" style="margin-top:4px">💾 Guardar saldos</button>
+        </div>
+      </div>
+      <div class="tabla-wrap" style="padding:16px">
+        <h4 style="margin:0 0 12px;color:var(--verde4)">🔄 Traspaso entre cuentas</h4>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="font-size:12px;font-weight:600">Desde</label>
+          <select id="traspaso-desde" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="banco">Banco → Caja</option>
+            <option value="caja">Caja → Banco</option>
+          </select>
+          <label style="font-size:12px;font-weight:600">Monto ($)</label>
+          <input id="traspaso-monto" type="number" placeholder="0" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="traspaso-desc" placeholder="Descripción" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <button class="btn btn-verde" onclick="registrarTraspaso()" style="margin-top:4px">↔️ Registrar traspaso</button>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
       <select id="conc-mes" onchange="cargarConciliacion2()" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
         ${mesesNom.map((m,i)=>`<option value="${i}" ${i===mesActual?'selected':''}>${m}</option>`).join('')}
@@ -2666,7 +2713,43 @@ function cargarConciliacion2() {
   }).catch(e=>console.error(e));
 }
 
-// ===== CARTAS: Nav separado =====
+// ===== CONCILIACIÓN: saldos iniciales y traspaso =====
+function guardarSaldosIniciales(){
+  const mes=document.getElementById('conc-mes')?.value??new Date().getMonth();
+  const anio=document.getElementById('conc-anio')?.value??new Date().getFullYear();
+  const banco=Number(document.getElementById('saldo-ini-banco').value)||0;
+  const caja=Number(document.getElementById('saldo-ini-caja').value)||0;
+  db.collection('conciliacion_config').doc(`${anio}-${mes}`).set({saldoBanco:banco,saldoCaja:caja,actualizado:new Date().toISOString()})
+    .then(()=>{ alert('Saldos guardados'); cargarConciliacion2(); })
+    .catch(e=>alert('Error: '+e.message));
+}
+function cargarSaldosIniciales(){
+  const mes=document.getElementById('conc-mes')?.value??new Date().getMonth();
+  const anio=document.getElementById('conc-anio')?.value??new Date().getFullYear();
+  db.collection('conciliacion_config').doc(`${anio}-${mes}`).get().then(doc=>{
+    if(doc.exists){
+      const d=doc.data();
+      if(document.getElementById('saldo-ini-banco')) document.getElementById('saldo-ini-banco').value=d.saldoBanco||0;
+      if(document.getElementById('saldo-ini-caja')) document.getElementById('saldo-ini-caja').value=d.saldoCaja||0;
+    }
+  }).catch(()=>{});
+}
+function registrarTraspaso(){
+  const desde=document.getElementById('traspaso-desde').value;
+  const monto=Number(document.getElementById('traspaso-monto').value)||0;
+  const desc=document.getElementById('traspaso-desc').value||'Traspaso entre cuentas';
+  const hoy=new Date().toISOString().split('T')[0];
+  if(!monto){alert('Ingresa un monto');return;}
+  const egreso={fecha:hoy,descripcion:desc,monto:monto,categoria:'Traspaso',formaPago:desde==='banco'?'Transferencia':'Efectivo',tipo:'traspaso'};
+  const ingreso={fecha:hoy,concepto:desc,monto:monto,unidad:'',forma:desde==='banco'?'Efectivo':'Transferencia',tipo:'traspaso'};
+  Promise.all([
+    db.collection('egresos').add(egreso),
+    db.collection('pagos').add(ingreso)
+  ]).then(()=>{ alert('Traspaso registrado'); document.getElementById('traspaso-monto').value=''; cargarConciliacion2(); })
+  .catch(e=>alert('Error: '+e.message));
+}
+
+
 function mostrarRegistroCartas(){
   const c=document.getElementById('content');
   c.innerHTML=`
