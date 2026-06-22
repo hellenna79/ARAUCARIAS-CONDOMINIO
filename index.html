@@ -557,9 +557,17 @@ function imprimirEstadoCuenta() {
 }
 function descargarPDFEstadoCuenta(){
   const contenido=document.getElementById('contenido-estado-cuenta').innerHTML;
-  const v=window.open('','_blank');
-  v.document.write(`<!DOCTYPE html><html><head><title>Estado de Cuenta</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:30px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd}@media print{body{padding:15px}}</style><script>window.onload=function(){window.print();}<\/script></head><body><h2>Estado de Cuenta — Condominio Las Araucarias</h2>${contenido}</body></html>`);
-  v.document.close();
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Estado de Cuenta</title>
+  <style>@page{size:letter;margin:2cm} body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:0}
+  table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd}img{max-width:100%}
+  @media print{body{padding:0}}</style>
+  <script>window.onload=function(){window.print();}<\/script>
+  </head><body><h2>Estado de Cuenta — Condominio Las Araucarias</h2>${contenido}</body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='EstadoCuenta_Araucarias.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 function descargarWordEstadoCuenta(){
   const contenido=document.getElementById('contenido-estado-cuenta').innerHTML;
@@ -1112,9 +1120,17 @@ function imprimirCarta() {
 
 function descargarPDFCarta(){
   const contenido=document.getElementById('contenido-carta').innerHTML;
-  const v=window.open('','_blank');
-  v.document.write(`<!DOCTYPE html><html><head><title>Carta Condominio Las Araucarias</title><style>body{font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:40px;max-width:750px;margin:0 auto}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc}@media print{body{padding:20px}}</style><script>window.onload=function(){window.print();}<\/script></head><body>${contenido}</body></html>`);
-  v.document.close();
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carta Araucarias</title>
+  <style>@page{size:letter;margin:2.5cm} body{font-family:Arial,sans-serif;font-size:13px;line-height:1.6;margin:0;padding:0}
+  table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc}img{max-width:100%}
+  @media print{body{padding:0}}</style>
+  <script>window.onload=function(){window.print();}<\/script>
+  </head><body>${contenido}</body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='Carta_Araucarias.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 function descargarWordCarta(){
   const contenido=document.getElementById('contenido-carta').innerHTML;
@@ -1784,15 +1800,29 @@ function cerrarModalCert(){document.getElementById('modal-cert').style.display='
 function buscarResidenteCert(){
   const unidad=document.getElementById('cert-unidad').value.trim();
   if(!unidad)return;
-  db.collection('residentes').where('unidad','==',unidad).get().then(snap=>{
-    if(!snap.empty){
-      const r=snap.docs[0].data();
-      document.getElementById('cert-nombre').value=r.nombre||'';
-      document.getElementById('cert-rut').value=r.rut||'';
-      certDeudaData={deuda:r.deuda||0,intereses:r.intereses||0,rut:r.rut||''};
+  // Primero buscar en datos guardados de certificados
+  db.collection('cert_datos').doc('u'+unidad).get().then(certDoc=>{
+    if(certDoc.exists){
+      const cd=certDoc.data();
+      document.getElementById('cert-nombre').value=cd.nombre||'';
+      document.getElementById('cert-rut').value=cd.rut||'';
+      certDeudaData={deuda:cd.deuda||0,intereses:cd.intereses||0,rut:cd.rut||''};
       const info=document.getElementById('cert-info');
       info.style.display='block';
-      info.innerHTML=`✅ <strong>${r.nombre}</strong> — ${certDeudaData.deuda+certDeudaData.intereses>0?'⚠️ Tiene deuda pendiente':'✅ Al día'}`;
+      info.innerHTML=`✅ <strong>${cd.nombre}</strong> — datos guardados previamente`;
+    } else {
+      // Si no hay datos guardados, buscar en residentes
+      db.collection('residentes').where('unidad','==',unidad).get().then(snap=>{
+        if(!snap.empty){
+          const r=snap.docs[0].data();
+          document.getElementById('cert-nombre').value=r.nombre||'';
+          document.getElementById('cert-rut').value=r.rut||'';
+          certDeudaData={deuda:r.deuda||0,intereses:r.intereses||0,rut:r.rut||''};
+          const info=document.getElementById('cert-info');
+          info.style.display='block';
+          info.innerHTML=`✅ <strong>${r.nombre}</strong> — ${certDeudaData.deuda+certDeudaData.intereses>0?'⚠️ Tiene deuda pendiente':'✅ Al día'}`;
+        }
+      });
     }
   });
 }
@@ -1803,6 +1833,8 @@ function emitirCertificado(){
   const rutVal=document.getElementById('cert-rut').value||certDeudaData.rut||'';
   const fechaRaw=document.getElementById('cert-fecha').value;
   if(!unidad||!nombre){alert('Ingresa la unidad y el nombre');return;}
+  // Guardar datos para próxima vez
+  db.collection('cert_datos').doc('u'+unidad).set({nombre,rut:rutVal,unidad,actualizado:new Date().toISOString()}).catch(()=>{});
   const [y,m,d]=fechaRaw.split('-');
   const mesesNom=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const mesTexto=mesesNom[parseInt(m)-1];
@@ -1900,14 +1932,17 @@ function imprimirCert(){
 }
 function descargarPDFCert(){
   const contenido=document.getElementById('contenido-cert').innerHTML;
-  const v=window.open('','_blank');
-  v.document.write(`<!DOCTYPE html><html><head><title>Certificado Las Araucarias</title>
-  <style>body{font-family:Arial,sans-serif;font-size:13px;line-height:1.8;padding:50px;max-width:700px;margin:0 auto}
-  table{width:100%;border-collapse:collapse}td{padding:8px;border:1px solid #ccc}
-  @media print{body{padding:30px}}</style>
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificado Araucarias</title>
+  <style>@page{size:letter;margin:2.5cm} body{font-family:Arial,sans-serif;font-size:13px;line-height:1.8;margin:0;padding:0}
+  table{width:100%;border-collapse:collapse}td{padding:8px;border:1px solid #ccc}img{max-width:100%}
+  @media print{body{padding:0}}</style>
   <script>window.onload=function(){window.print();}<\/script>
-  </head><body>${contenido}</body></html>`);
-  v.document.close();
+  </head><body>${contenido}</body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='Certificado_Araucarias.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
 function descargarWordCert(){
