@@ -191,12 +191,14 @@ const auth = firebase.auth();
 // ===================== AUTH =====================
 function loginGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(e => alert('Error al iniciar sesión: ' + e.message));
+  auth.signInWithRedirect(provider);
 }
 
 function cerrarSesion() {
   auth.signOut();
 }
+
+auth.getRedirectResult().catch(e => console.error('Redirect error:', e));
 
 auth.onAuthStateChanged(user => {
   if (user) {
