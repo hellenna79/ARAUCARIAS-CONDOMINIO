@@ -1107,7 +1107,7 @@ function descargarWordCarta(){
   const a=document.createElement('a');a.href=url;a.download='Carta_Araucarias.doc';a.click();
 }
 
- document.getElementById('modal-egreso').style.display='flex'; }
+function abrirModalEgreso() { document.getElementById('modal-egreso').style.display='flex'; document.getElementById('e-fecha').value=new Date().toISOString().split('T')[0]; }
 function cerrarModalEgreso() { document.getElementById('modal-egreso').style.display='none'; }
 function guardarEgreso() {
   const datos = {
