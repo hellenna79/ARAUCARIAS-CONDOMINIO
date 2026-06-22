@@ -411,9 +411,10 @@ function guardarResidente() {
 function mostrarRecaudacion() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn btn-verde" onclick="abrirImportarExcelRecaudacion()">📥 Importar Excel</button>
       <button class="btn btn-verde" onclick="abrirModalPago()">+ Registrar pago / ajuste</button>
+      <button class="btn btn-verde" style="background:#dc2626" onclick="abrirEliminarLote()">🗑️ Eliminar por lote</button>
       <button class="btn btn-verde" style="background:#1d4ed8" onclick="mostrarEstadoCuenta()">📊 Estado de cuenta por unidad</button>
     </div>
     <div class="tabla-wrap">
@@ -560,14 +561,164 @@ function imprimirEstadoCuenta() {
 function cargarPagos() {
   db.collection('pagos').orderBy('fecha','desc').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay pagos registrados</div>'; return; }
-    let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th><th style="text-align:center">Acciones</th></tr></thead><tbody>';
     snap.forEach(d => {
       const p = d.data();
-      html += `<tr><td>${p.fecha||'—'}</td><td>${p.unidad||'—'}</td><td>${p.concepto||'—'}</td><td>$${Number(p.monto||0).toLocaleString('es-CL')}</td><td><span class="badge badge-gris">${p.forma||'—'}</span></td></tr>`;
+      const id = d.id;
+      const dataStr = encodeURIComponent(JSON.stringify({id, ...p}));
+      html += `<tr>
+        <td>${p.fecha||'—'}</td>
+        <td>${p.unidad||'—'}</td>
+        <td>${p.concepto||'—'}</td>
+        <td>$${Number(p.monto||0).toLocaleString('es-CL')}</td>
+        <td><span class="badge badge-gris">${p.forma||'—'}</span></td>
+        <td style="text-align:center;white-space:nowrap">
+          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick='abrirEditarPago(${JSON.stringify({id,...p})})'>✏️ Editar</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarPago('${id}','${p.unidad||''}','${p.fecha||''}')">🗑️</button>
+        </td>
+      </tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('lista-pagos').innerHTML = html;
   }).catch(() => { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Sin pagos registrados aún</div>'; });
+}
+
+function eliminarPago(id, unidad, fecha) {
+  if (!confirm(`¿Eliminar el pago de unidad ${unidad} del ${fecha}?\nEsta acción no se puede deshacer.`)) return;
+  db.collection('pagos').doc(id).delete().then(() => { cargarPagos(); }).catch(e => alert('Error al eliminar: ' + e.message));
+}
+
+function abrirEditarPago(p) {
+  const existente = document.getElementById('modal-editar-pago');
+  if (existente) existente.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-editar-pago';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:420px;max-width:92vw">
+      <h3 style="margin-bottom:20px;color:var(--verde4)">✏️ Editar pago — Unidad ${p.unidad||''}</h3>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <input id="ep-unidad" placeholder="N° unidad" value="${p.unidad||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <select id="ep-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <option value="Pago" ${(p.tipo||'Pago')==='Pago'?'selected':''}>Pago</option>
+          <option value="Ajuste" ${p.tipo==='Ajuste'?'selected':''}>Ajuste (no suma al saldo)</option>
+        </select>
+        <input id="ep-concepto" placeholder="Concepto" value="${p.concepto||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <input id="ep-monto" type="number" placeholder="Monto ($)" value="${p.monto||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <input id="ep-fecha" type="date" value="${p.fecha||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <select id="ep-forma" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <option ${(p.forma||'')==='Transferencia'?'selected':''}>Transferencia</option>
+          <option ${p.forma==='Efectivo'?'selected':''}>Efectivo</option>
+          <option ${p.forma==='Cheque'?'selected':''}>Cheque</option>
+          <option ${p.forma==='Débito'?'selected':''}>Débito</option>
+          <option ${p.forma==='Ajuste/Compensación'?'selected':''}>Ajuste/Compensación</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-editar-pago').remove()">Cancelar</button>
+        <button class="btn btn-verde" onclick="guardarEdicionPago('${p.id}')">💾 Guardar cambios</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function guardarEdicionPago(id) {
+  const datos = {
+    unidad: document.getElementById('ep-unidad').value,
+    tipo: document.getElementById('ep-tipo').value,
+    concepto: document.getElementById('ep-concepto').value,
+    monto: Number(document.getElementById('ep-monto').value),
+    fecha: document.getElementById('ep-fecha').value,
+    forma: document.getElementById('ep-forma').value,
+  };
+  if (!datos.unidad || !datos.monto) { alert('Ingresa al menos la unidad y el monto'); return; }
+  db.collection('pagos').doc(id).update(datos)
+    .then(() => { document.getElementById('modal-editar-pago').remove(); cargarPagos(); })
+    .catch(e => alert('Error al guardar: ' + e.message));
+}
+
+function abrirEliminarLote() {
+  const existente = document.getElementById('modal-eliminar-lote');
+  if (existente) existente.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-eliminar-lote';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
+  // Calcular meses disponibles
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:500px;max-width:94vw">
+      <h3 style="margin-bottom:6px;color:#dc2626">🗑️ Eliminar pagos por lote</h3>
+      <p style="font-size:13px;color:#666;margin-bottom:18px">Puedes filtrar y eliminar registros por mes/año, unidad o un rango de fechas. <strong>Esta acción es irreversible.</strong></p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;width:110px">Mes/Año:</label>
+          <input id="el-mes" type="month" style="flex:1;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;width:110px">Unidad (opc.):</label>
+          <input id="el-unidad" placeholder="Ej: 5  (dejar vacío = todas)" style="flex:1;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap">
+        <button class="btn" style="background:#f1f5f9;color:#1e293b" onclick="previsualizarLote()">🔍 Previsualizar registros</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="document.getElementById('modal-eliminar-lote').remove()">Cancelar</button>
+          <button id="btn-confirmar-eliminar-lote" class="btn" style="background:#dc2626;color:white;display:none" onclick="confirmarEliminarLote()">🗑️ Eliminar estos registros</button>
+        </div>
+      </div>
+      <div id="lote-preview" style="margin-top:14px;max-height:280px;overflow-y:auto;font-size:12px"></div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+let _loteIds = [];
+function previsualizarLote() {
+  const mes = document.getElementById('el-mes').value; // "YYYY-MM"
+  const unidad = document.getElementById('el-unidad').value.trim();
+  const preview = document.getElementById('lote-preview');
+  const btnElim = document.getElementById('btn-confirmar-eliminar-lote');
+  _loteIds = [];
+  btnElim.style.display = 'none';
+  if (!mes) { preview.innerHTML = '<p style="color:#dc2626">Selecciona un mes/año para filtrar.</p>'; return; }
+  preview.innerHTML = '<p style="color:#666">⏳ Buscando registros...</p>';
+  db.collection('pagos').get().then(snap => {
+    const encontrados = [];
+    snap.forEach(d => {
+      const p = d.data();
+      const fechaMes = (p.fecha||'').slice(0,7); // "YYYY-MM"
+      const coincideMes = fechaMes === mes;
+      const coincideUnidad = !unidad || String(p.unidad||'') === unidad;
+      if (coincideMes && coincideUnidad) encontrados.push({id:d.id, ...p});
+    });
+    if (!encontrados.length) { preview.innerHTML = '<p style="color:#999;padding:10px">No se encontraron registros para ese criterio.</p>'; return; }
+    _loteIds = encontrados.map(r => r.id);
+    let html = `<div style="margin-bottom:10px;font-weight:600;color:#dc2626">⚠️ Se encontraron <strong>${encontrados.length} registros</strong> que serán eliminados:</div>`;
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#fee2e2"><th style="padding:5px">Fecha</th><th style="padding:5px">Unidad</th><th style="padding:5px">Concepto</th><th style="padding:5px;text-align:right">Monto</th></tr></thead><tbody>';
+    encontrados.slice(0,20).forEach(r => {
+      html += `<tr style="border-bottom:1px solid #fecaca"><td style="padding:4px 5px">${r.fecha||'—'}</td><td style="padding:4px 5px;text-align:center">${r.unidad||'—'}</td><td style="padding:4px 5px">${r.concepto||'—'}</td><td style="padding:4px 5px;text-align:right">$${Number(r.monto||0).toLocaleString('es-CL')}</td></tr>`;
+    });
+    if (encontrados.length > 20) html += `<tr><td colspan="4" style="padding:6px;text-align:center;color:#999">...y ${encontrados.length-20} registros más</td></tr>`;
+    html += '</tbody></table>';
+    preview.innerHTML = html;
+    btnElim.style.display = 'inline-block';
+    btnElim.textContent = `🗑️ Eliminar ${_loteIds.length} registros`;
+  });
+}
+
+async function confirmarEliminarLote() {
+  if (!_loteIds.length) return;
+  if (!confirm(`¿Estás segura de eliminar ${_loteIds.length} registros?\n\nEsta acción NO se puede deshacer.`)) return;
+  const btn = document.getElementById('btn-confirmar-eliminar-lote');
+  const preview = document.getElementById('lote-preview');
+  btn.disabled = true;
+  preview.innerHTML = '<p style="color:#666">⏳ Eliminando registros...</p>';
+  let ok = 0;
+  for (const id of _loteIds) {
+    try { await db.collection('pagos').doc(id).delete(); ok++; } catch(e) {}
+  }
+  preview.innerHTML = `<p style="color:#166534;font-weight:600">✅ Se eliminaron ${ok} registros correctamente.</p>`;
+  _loteIds = [];
+  btn.style.display = 'none';
+  setTimeout(() => { const m = document.getElementById('modal-eliminar-lote'); if(m) m.remove(); cargarPagos(); }, 1800);
 }
 
 function abrirModalPago() { document.getElementById('modal-pago').style.display = 'flex'; document.getElementById('p-fecha').value=new Date().toISOString().split('T')[0]; }
