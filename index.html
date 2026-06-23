@@ -584,93 +584,148 @@ function guardarPago() {
 }
 
 // ===================== GASTOS COMUNES =====================
+// mesCerrado: false = mes abierto (totalMes=0), true = mes cerrado (totalMes cargado)
+let mesCerrado = false;
+const MES_ACTUAL = 'Junio 2026';
+
+// Función para recalcular totalCobrado de una unidad
+function calcularTotalCobrado(g) {
+  const bruto = g.capitalAtrasado + g.totalMes + g.intereses - g.abonos;
+  return Math.max(0, bruto);
+}
+
 const GASTOS_JULIO_2026 = [
-  {unidad:'1',residente:'Viviana Navarro',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:33000,intereses:0,abonos:0,totalCobrado:55000,saldoFavor:0},
-  {unidad:'2',residente:'Elena Maturana Toro Maturana',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44000,intereses:0,abonos:0,totalCobrado:66000,saldoFavor:0},
-  {unidad:'3',residente:'Paola Alejandra Manzano Villalón',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44000,intereses:0,abonos:0,totalCobrado:66000,saldoFavor:0},
-  {unidad:'4',residente:'Mauricio Jorge Saavedra Sandoval',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'5',residente:'Viviana Andrea Calderón Salinas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:66000,intereses:0,abonos:0,totalCobrado:88000,saldoFavor:0},
-  {unidad:'6',residente:'Eduardo Arancibia Plaza',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:31847,intereses:208,abonos:0,totalCobrado:54055,saldoFavor:0},
-  {unidad:'7',residente:'Jimena Pizarro',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:26,intereses:0,abonos:0,totalCobrado:22026,saldoFavor:0},
-  {unidad:'8',residente:'Gonzalo Saavedra',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'9',residente:'Laura Valeska Ordenes Castillo',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'10',residente:'Betsabe Ester Pizarro Tapia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:37886,intereses:336,abonos:0,totalCobrado:60222,saldoFavor:0},
-  {unidad:'11',residente:'Antonia Albornoz Vargas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'12',residente:'Yessica Devía Olivares',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'13',residente:'Valery Ossandon Jara',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'14',residente:'Robín Williams Zalazar Zamora',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'15',residente:'Nicole Estefanía Reyes Rozas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22082,intereses:2,abonos:0,totalCobrado:44084,saldoFavor:0},
-  {unidad:'16',residente:'Celia María Escobar López',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'17',residente:'Roberto Román',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'18',residente:'Guillermo Maturana',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44996,intereses:465,abonos:0,totalCobrado:67461,saldoFavor:0},
-  {unidad:'19',residente:'Marisel Mercedes Rivera Villalobos',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'20',residente:'Saira Estrella Díaz Cisterna',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'21',residente:'Alejandra Andrea Mena Silva',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'22',residente:'Priscila Antonia Esquivel Ordenes',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:126923,intereses:0,abonos:0,totalCobrado:148923,saldoFavor:0},
-  {unidad:'23',residente:'Esteban Andrés Tapia Valencia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:44000,intereses:0,abonos:0,totalCobrado:66000,saldoFavor:0},
-  {unidad:'24',residente:'Nelson Abraham Álvarez Borquez',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:108000,intereses:0,abonos:0,totalCobrado:130000,saldoFavor:0},
-  {unidad:'25',residente:'Cristian Rivera Gajardo',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'26',residente:'Carlos Castillo Rodríguez',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:45461,intereses:496,abonos:0,totalCobrado:67957,saldoFavor:0},
-  {unidad:'27',residente:'Luz Marina Miranda Allende',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'28',residente:'José Luis Jamett Carrasco',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:21306,intereses:0,abonos:0,totalCobrado:43306,saldoFavor:0},
-  {unidad:'29',residente:'Rodrigo Fernandez Briceño',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'30',residente:'Carolina Morales Arancibia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22650,intereses:10,abonos:0,totalCobrado:44660,saldoFavor:0},
-  {unidad:'31',residente:'Aníbal Aros Godoy',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'32',residente:'Jessica Fortunato Berrios',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'33',residente:'Sandra Salinas Soto',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:121,intereses:0,abonos:0,totalCobrado:22121,saldoFavor:0},
-  {unidad:'34',residente:'Yosmaira',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:23981,intereses:33,abonos:0,totalCobrado:46014,saldoFavor:0},
-  {unidad:'35',residente:'Francisco Javier Collao Blanca',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:17598,intereses:0,abonos:0,totalCobrado:39598,saldoFavor:0},
-  {unidad:'36',residente:'Fernando Delgadillo Bruna',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'37',residente:'Rebeca Noemí Salazar Araya',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'38',residente:'Jusep Andrea Burgos Vargas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'39',residente:'Jose Luis Ortiz Estay',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:65082,intereses:879,abonos:0,totalCobrado:87961,saldoFavor:0},
-  {unidad:'40',residente:'Gerardo Manuel Torres Ceballos',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'41',residente:'Denisse Pimentel',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:48340,intereses:548,abonos:0,totalCobrado:70888,saldoFavor:0},
-  {unidad:'42',residente:'Carla Hansen Baeza',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:21068,intereses:0,abonos:0,totalCobrado:43068,saldoFavor:0},
-  {unidad:'43',residente:'Marco Heraldo Díaz Villegas',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:42,intereses:0,abonos:0,totalCobrado:22042,saldoFavor:0},
-  {unidad:'44',residente:'Luis Gabriel Robles Otarola',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22052,intereses:27,abonos:0,totalCobrado:44079,saldoFavor:0},
-  {unidad:'45',residente:'Luis Cordova',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:727553,intereses:9901,abonos:0,totalCobrado:759454,saldoFavor:0},
-  {unidad:'46',residente:'Katherin Rosa Tapia Tapia',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'47',residente:'Diego Cataldo',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'48',residente:'Jolibert Jannette Larez Torrealba',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'49',residente:'Romina Araceli Choque Brito',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'50',residente:'Alejandro Ramírez Zarricueta',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22000,intereses:0,abonos:0,totalCobrado:44000,saldoFavor:0},
-  {unidad:'51',residente:'Yeison Ramírez Zarricueta',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:24675,intereses:0,abonos:0,totalCobrado:46675,saldoFavor:0},
-  {unidad:'52',residente:'Corredora',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:22000,totalCobrado:0,saldoFavor:47719},
-  {unidad:'53',residente:'José Domingo Tapia Figueroa',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:27,abonos:839,totalCobrado:21188,saldoFavor:0},
-  {unidad:'54',residente:'Andrea Lombardo Morales',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'55',residente:'Katherine Villarreal',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22135,intereses:0,abonos:0,totalCobrado:44135,saldoFavor:0},
-  {unidad:'56',residente:'Natalia Andrea Álvarez Carroza',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'57',residente:'Ignacia Cisternas Riveros',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:22221,intereses:5,abonos:0,totalCobrado:44226,saldoFavor:0},
-  {unidad:'58',residente:'David Marco Cortes García',prorrateo:22000,gcEgresos:22000,totalMes:22000,capitalAtrasado:0,intereses:0,abonos:0,totalCobrado:22000,saldoFavor:0},
-  {unidad:'115',residente:'Marilyn Ramírez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'117',residente:'Yimi Bahamondes Olmos',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:30000,intereses:0,abonos:0,totalCobrado:36000,saldoFavor:0},
-  {unidad:'119',residente:'Yosselyn Cataldo Ponce',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'121',residente:'Johana Jaime',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:36000,intereses:0,abonos:0,totalCobrado:42000,saldoFavor:0},
-  {unidad:'123',residente:'Christian Jovanny Pino Morales',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'125',residente:'Eduardo Carreño',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:64095,intereses:0,abonos:0,totalCobrado:70095,saldoFavor:0},
-  {unidad:'127',residente:'Karen Daniela Salzmann Saavedra',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'129',residente:'David Eric Aguilera Núñez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'131',residente:'Edith Robles',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'133',residente:'Luis García Álvarez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'135',residente:'Carlos Diaz Frez',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:967712,intereses:9464,abonos:0,totalCobrado:983176,saldoFavor:0},
-  {unidad:'137',residente:'Luis Bustamante Aranguiz',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'139',residente:'Jordán Francisco Flores Maturana',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:977712,intereses:9464,abonos:0,totalCobrado:993176,saldoFavor:0},
-  {unidad:'141',residente:'Sin usuario a cargo',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'143',residente:'Alejandro Rojas Huerta',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'145',residente:'Nicolás Cordero Lorenzi',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:987712,intereses:9464,abonos:0,totalCobrado:1003176,saldoFavor:0},
-  {unidad:'280',residente:'Ricardo Huerta Zepeda',prorrateo:6000,gcEgresos:6000,totalMes:6000,capitalAtrasado:12000,intereses:0,abonos:0,totalCobrado:18000,saldoFavor:0},
+  {unidad:'1',residente:'Viviana Navarro',prorrateo:22000,totalMes:0,capitalAtrasado:33000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'2',residente:'Elena Maturana Toro Maturana',prorrateo:22000,totalMes:0,capitalAtrasado:44000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'3',residente:'Paola Alejandra Manzano Villalón',prorrateo:22000,totalMes:0,capitalAtrasado:44000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'4',residente:'Mauricio Jorge Saavedra Sandoval',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'5',residente:'Viviana Andrea Calderón Salinas',prorrateo:22000,totalMes:0,capitalAtrasado:66000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'6',residente:'Eduardo Arancibia Plaza',prorrateo:22000,totalMes:0,capitalAtrasado:31847,intereses:208,abonos:0,saldoFavor:0},
+  {unidad:'7',residente:'Jimena Pizarro',prorrateo:22000,totalMes:0,capitalAtrasado:26,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'8',residente:'Gonzalo Saavedra',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'9',residente:'Laura Valeska Ordenes Castillo',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'10',residente:'Betsabe Ester Pizarro Tapia',prorrateo:22000,totalMes:0,capitalAtrasado:37886,intereses:336,abonos:0,saldoFavor:0},
+  {unidad:'11',residente:'Antonia Albornoz Vargas',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'12',residente:'Yessica Devía Olivares',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'13',residente:'Valery Ossandon Jara',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'14',residente:'Robín Williams Zalazar Zamora',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'15',residente:'Nicole Estefanía Reyes Rozas',prorrateo:22000,totalMes:0,capitalAtrasado:22082,intereses:2,abonos:0,saldoFavor:0},
+  {unidad:'16',residente:'Celia María Escobar López',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'17',residente:'Roberto Román',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'18',residente:'Guillermo Maturana',prorrateo:22000,totalMes:0,capitalAtrasado:44996,intereses:465,abonos:0,saldoFavor:0},
+  {unidad:'19',residente:'Marisel Mercedes Rivera Villalobos',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'20',residente:'Saira Estrella Díaz Cisterna',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'21',residente:'Alejandra Andrea Mena Silva',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'22',residente:'Priscila Antonia Esquivel Ordenes',prorrateo:22000,totalMes:0,capitalAtrasado:126923,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'23',residente:'Esteban Andrés Tapia Valencia',prorrateo:22000,totalMes:0,capitalAtrasado:44000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'24',residente:'Nelson Abraham Álvarez Borquez',prorrateo:22000,totalMes:0,capitalAtrasado:108000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'25',residente:'Cristian Rivera Gajardo',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'26',residente:'Carlos Castillo Rodríguez',prorrateo:22000,totalMes:0,capitalAtrasado:45461,intereses:496,abonos:0,saldoFavor:0},
+  {unidad:'27',residente:'Luz Marina Miranda Allende',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'28',residente:'José Luis Jamett Carrasco',prorrateo:22000,totalMes:0,capitalAtrasado:21306,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'29',residente:'Rodrigo Fernandez Briceño',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'30',residente:'Carolina Morales Arancibia',prorrateo:22000,totalMes:0,capitalAtrasado:22650,intereses:10,abonos:0,saldoFavor:0},
+  {unidad:'31',residente:'Aníbal Aros Godoy',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'32',residente:'Jessica Fortunato Berrios',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'33',residente:'Sandra Salinas Soto',prorrateo:22000,totalMes:0,capitalAtrasado:121,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'34',residente:'Yosmaira',prorrateo:22000,totalMes:0,capitalAtrasado:23981,intereses:33,abonos:0,saldoFavor:0},
+  {unidad:'35',residente:'Francisco Javier Collao Blanca',prorrateo:22000,totalMes:0,capitalAtrasado:17598,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'36',residente:'Fernando Delgadillo Bruna',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'37',residente:'Rebeca Noemí Salazar Araya',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'38',residente:'Jusep Andrea Burgos Vargas',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'39',residente:'Jose Luis Ortiz Estay',prorrateo:22000,totalMes:0,capitalAtrasado:65082,intereses:879,abonos:0,saldoFavor:0},
+  {unidad:'40',residente:'Gerardo Manuel Torres Ceballos',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'41',residente:'Denisse Pimentel',prorrateo:22000,totalMes:0,capitalAtrasado:48340,intereses:548,abonos:0,saldoFavor:0},
+  {unidad:'42',residente:'Carla Hansen Baeza',prorrateo:22000,totalMes:0,capitalAtrasado:21068,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'43',residente:'Marco Heraldo Díaz Villegas',prorrateo:22000,totalMes:0,capitalAtrasado:42,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'44',residente:'Luis Gabriel Robles Otarola',prorrateo:22000,totalMes:0,capitalAtrasado:22052,intereses:27,abonos:0,saldoFavor:0},
+  {unidad:'45',residente:'Luis Cordova',prorrateo:22000,totalMes:0,capitalAtrasado:727553,intereses:9901,abonos:0,saldoFavor:0},
+  {unidad:'46',residente:'Katherin Rosa Tapia Tapia',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'47',residente:'Diego Cataldo',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'48',residente:'Jolibert Jannette Larez Torrealba',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'49',residente:'Romina Araceli Choque Brito',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'50',residente:'Alejandro Ramírez Zarricueta',prorrateo:22000,totalMes:0,capitalAtrasado:22000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'51',residente:'Yeison Ramírez Zarricueta',prorrateo:22000,totalMes:0,capitalAtrasado:24675,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'52',residente:'Corredora',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:22000,saldoFavor:47719},
+  {unidad:'53',residente:'José Domingo Tapia Figueroa',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:27,abonos:839,saldoFavor:0},
+  {unidad:'54',residente:'Andrea Lombardo Morales',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'55',residente:'Katherine Villarreal',prorrateo:22000,totalMes:0,capitalAtrasado:22135,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'56',residente:'Natalia Andrea Álvarez Carroza',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'57',residente:'Ignacia Cisternas Riveros',prorrateo:22000,totalMes:0,capitalAtrasado:22221,intereses:5,abonos:0,saldoFavor:0},
+  {unidad:'58',residente:'David Marco Cortes García',prorrateo:22000,totalMes:0,capitalAtrasado:0,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'115',residente:'Marilyn Ramírez',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'117',residente:'Yimi Bahamondes Olmos',prorrateo:6000,totalMes:0,capitalAtrasado:30000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'119',residente:'Yosselyn Cataldo Ponce',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'121',residente:'Johana Jaime',prorrateo:6000,totalMes:0,capitalAtrasado:36000,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'123',residente:'Christian Jovanny Pino Morales',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'125',residente:'Eduardo Carreño',prorrateo:6000,totalMes:0,capitalAtrasado:64095,intereses:0,abonos:0,saldoFavor:0},
+  {unidad:'127',residente:'Karen Daniela Salzmann Saavedra',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'129',residente:'David Eric Aguilera Núñez',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'131',residente:'Edith Robles',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'133',residente:'Luis García Álvarez',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'135',residente:'Carlos Diaz Frez',prorrateo:6000,totalMes:0,capitalAtrasado:967712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'137',residente:'Luis Bustamante Aranguiz',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'139',residente:'Jordán Francisco Flores Maturana',prorrateo:6000,totalMes:0,capitalAtrasado:977712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'141',residente:'Sin usuario a cargo',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'143',residente:'Alejandro Rojas Huerta',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'145',residente:'Nicolás Cordero Lorenzi',prorrateo:6000,totalMes:0,capitalAtrasado:987712,intereses:9464,abonos:0,saldoFavor:0},
+  {unidad:'280',residente:'Ricardo Huerta Zepeda',prorrateo:6000,totalMes:0,capitalAtrasado:12000,intereses:0,abonos:0,saldoFavor:0},
 ];
+
+function cerrarMesGastos() {
+  if (mesCerrado) { alert('El mes ya fue cerrado.'); return; }
+  if (!confirm('¿Confirmas el cierre del mes ' + MES_ACTUAL + '?\n\nEsto cargará el gasto común mensual y calculará los intereses sobre el capital atrasado.')) return;
+  const TASA_DIARIA = 0.001173;
+  const DIAS = 30;
+  GASTOS_JULIO_2026.forEach(g => {
+    g.totalMes = g.prorrateo;
+    if (g.capitalAtrasado > 0) {
+      const intMes = Math.round(g.capitalAtrasado * TASA_DIARIA * DIAS);
+      g.intereses = (g.intereses || 0) + intMes;
+    }
+    g.capitalAtrasado = g.capitalAtrasado + g.totalMes;
+  });
+  mesCerrado = true;
+  renderGastosTabla();
+  const btn = document.getElementById('btn-cerrar-mes');
+  if (btn) { btn.textContent = '✅ Mes cerrado'; btn.disabled = true; btn.style.opacity = '0.6'; }
+  alert('✅ Mes ' + MES_ACTUAL + ' cerrado correctamente.\nLos abonos registrados en Recaudación se descontarán del Total Cobrado.');
+}
+
+function sincronizarAbonosDesdeRecaudacion() {
+  const mesKey = '2026-06';
+  db.collection('pagos').where('fecha','>=', mesKey+'-01').where('fecha','<=', mesKey+'-30').get().then(snap => {
+    GASTOS_JULIO_2026.forEach(g => { g.abonos = 0; });
+    snap.forEach(doc => {
+      const p = doc.data();
+      if (!p.unidad || !p.monto) return;
+      const g = GASTOS_JULIO_2026.find(x => x.unidad === String(p.unidad));
+      if (g) g.abonos += Number(p.monto);
+    });
+    renderGastosTabla();
+  }).catch(() => {});
+}
 
 function mostrarGastos() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
-      <button class="btn btn-verde" onclick="abrirModalGasto()">+ Nuevo gasto común</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="btn-cerrar-mes" class="btn" style="background:#1a7a4a;color:white;${mesCerrado?'opacity:0.6':''}" onclick="cerrarMesGastos()" ${mesCerrado?'disabled':''}>
+          ${mesCerrado ? '✅ Mes cerrado' : '🔒 Cerrar mes ' + MES_ACTUAL}
+        </button>
+        <button class="btn btn-outline" onclick="sincronizarAbonosDesdeRecaudacion()" title="Actualiza abonos desde pagos de Recaudación">🔄 Sincronizar abonos</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
+        <button class="btn btn-verde" onclick="abrirModalGasto()">+ Nuevo gasto común</button>
+      </div>
     </div>
     <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Gastos comunes — Julio 2026</h3><span style="font-size:12px;color:var(--texto2)">75 unidades · Cargados desde planilla oficial</span></div>
+      <div class="tabla-header">
+        <h3>Gastos comunes — ${MES_ACTUAL}</h3>
+        <span style="font-size:12px;color:var(--texto2)">${mesCerrado ? '🔒 Mes cerrado' : '⏳ Mes abierto — pendiente cierre'}</span>
+      </div>
       <div id="lista-gastos"></div>
     </div>
     <div id="modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center">
@@ -700,11 +755,7 @@ function mostrarGastos() {
             <input id="eg-prorrateo" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">GC Egresos ($)</label>
-            <input id="eg-gcEgresos" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Total Mes ($)</label>
+            <label style="font-size:11px;font-weight:600;color:#1a7a4a;display:block;margin-bottom:4px">Total Mes ($)</label>
             <input id="eg-totalMes" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           </div>
           <div>
@@ -716,18 +767,15 @@ function mostrarGastos() {
             <input id="eg-intereses" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Abonos ($)</label>
+            <label style="font-size:11px;font-weight:600;color:#16a34a;display:block;margin-bottom:4px">Abonos ($)</label>
             <input id="eg-abonos" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Total Cobrado ($)</label>
-            <input id="eg-totalCobrado" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           </div>
           <div>
             <label style="font-size:11px;font-weight:600;color:#16a34a;display:block;margin-bottom:4px">Saldo Favor ($)</label>
             <input id="eg-saldoFavor" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           </div>
         </div>
+        <p style="font-size:11px;color:#999;margin-top:10px">💡 El Total Cobrado se calcula automáticamente: Capital Atrasado + Total Mes + Intereses − Abonos</p>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="cerrarModalEditarGasto()">Cancelar</button>
           <button class="btn btn-verde" onclick="guardarEdicionGasto()">💾 Guardar cambios</button>
@@ -740,14 +788,12 @@ function mostrarGastos() {
 function editarGasto(idx) {
   const g = GASTOS_JULIO_2026[idx];
   document.getElementById('eg-idx').value = idx;
-  document.getElementById('eg-unidad').textContent = g.unidad + ' — ' + g.residente;
+  document.getElementById('eg-unidad').textContent = 'Unidad ' + g.unidad + ' — ' + g.residente;
   document.getElementById('eg-prorrateo').value = g.prorrateo;
-  document.getElementById('eg-gcEgresos').value = g.gcEgresos;
   document.getElementById('eg-totalMes').value = g.totalMes;
   document.getElementById('eg-capitalAtrasado').value = g.capitalAtrasado;
   document.getElementById('eg-intereses').value = g.intereses;
   document.getElementById('eg-abonos').value = g.abonos;
-  document.getElementById('eg-totalCobrado').value = g.totalCobrado;
   document.getElementById('eg-saldoFavor').value = g.saldoFavor;
   document.getElementById('modal-editar-gasto').style.display = 'flex';
 }
@@ -756,12 +802,10 @@ function guardarEdicionGasto() {
   const idx = parseInt(document.getElementById('eg-idx').value);
   const g = GASTOS_JULIO_2026[idx];
   g.prorrateo       = Number(document.getElementById('eg-prorrateo').value) || 0;
-  g.gcEgresos       = Number(document.getElementById('eg-gcEgresos').value) || 0;
   g.totalMes        = Number(document.getElementById('eg-totalMes').value) || 0;
   g.capitalAtrasado = Number(document.getElementById('eg-capitalAtrasado').value) || 0;
   g.intereses       = Number(document.getElementById('eg-intereses').value) || 0;
   g.abonos          = Number(document.getElementById('eg-abonos').value) || 0;
-  g.totalCobrado    = Number(document.getElementById('eg-totalCobrado').value) || 0;
   g.saldoFavor      = Number(document.getElementById('eg-saldoFavor').value) || 0;
   document.getElementById('modal-editar-gasto').style.display = 'none';
   renderGastosTabla();
@@ -772,45 +816,42 @@ function cerrarModalEditarGasto() {
 }
 
 function renderGastosTabla() {
-  // Ordenar por número de unidad (correlativo menor a mayor)
   const gastosOrdenados = [...GASTOS_JULIO_2026].sort((a, b) => Number(a.unidad) - Number(b.unidad));
-
   let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
-    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>GC Egresos</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th></th>
+    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th></th>
   </tr></thead><tbody>`;
+  let totProrrateo=0, totTotalMes=0, totCapital=0, totIntereses=0, totAbonos=0, totCobrado=0, totSaldo=0;
   gastosOrdenados.forEach(g => {
     const idx = GASTOS_JULIO_2026.indexOf(g);
-    const deudaTotal = g.capitalAtrasado + g.intereses;
+    // Total cobrado = Capital Atrasado + Total Mes + Intereses - Abonos
+    const totalCobrado = Math.max(0, g.capitalAtrasado + g.totalMes + g.intereses - g.abonos);
+    const deudaTotal = g.capitalAtrasado + g.totalMes + g.intereses;
     const rowColor = deudaTotal > 66000 ? '#fff5f5' : g.saldoFavor > 0 ? '#f0fdf4' : '';
+    totProrrateo += g.prorrateo; totTotalMes += g.totalMes; totCapital += g.capitalAtrasado;
+    totIntereses += g.intereses; totAbonos += g.abonos; totCobrado += totalCobrado; totSaldo += g.saldoFavor;
     html += `<tr style="background:${rowColor}">
       <td><strong>${g.unidad}</strong></td>
       <td>${g.residente}</td>
       <td style="text-align:right">$${g.prorrateo.toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${g.gcEgresos.toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${g.totalMes.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.totalMes>0?'color:#1a7a4a;font-weight:600':'color:#999'}">$${g.totalMes.toLocaleString('es-CL')}</td>
       <td style="text-align:right;${g.capitalAtrasado>0?'color:#dc2626;font-weight:600':''}">$${g.capitalAtrasado.toLocaleString('es-CL')}</td>
       <td style="text-align:right;${g.intereses>0?'color:#f97316':''}">$${g.intereses.toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${g.abonos.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;font-weight:600">$${g.totalCobrado.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.abonos>0?'color:#16a34a':''}">$${g.abonos.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;font-weight:700;color:${totalCobrado>0?'#1a2e1f':'#999'}">$${totalCobrado.toLocaleString('es-CL')}</td>
       <td style="text-align:right;${g.saldoFavor>0?'color:#16a34a;font-weight:600':''}">$${g.saldoFavor.toLocaleString('es-CL')}</td>
-      <td><button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde)" onclick="editarGasto(${idx})">✏️ Editar</button></td>
+      <td><button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde)" onclick="editarGasto(${idx})">✏️</button></td>
     </tr>`;
   });
-  const totProrrateo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.prorrateo,0);
-  const totCapital = GASTOS_JULIO_2026.reduce((s,g)=>s+g.capitalAtrasado,0);
-  const totIntereses = GASTOS_JULIO_2026.reduce((s,g)=>s+g.intereses,0);
-  const totCobrado = GASTOS_JULIO_2026.reduce((s,g)=>s+g.totalCobrado,0);
-  const totSaldo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.saldoFavor,0);
   html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700">
     <td colspan="2">TOTALES</td>
     <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
-    <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
-    <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
+    <td style="text-align:right;color:#1a7a4a">$${totTotalMes.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#dc2626">$${totCapital.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#f97316">$${totIntereses.toLocaleString('es-CL')}</td>
-    <td style="text-align:right">$0</td>
+    <td style="text-align:right;color:#16a34a">$${totAbonos.toLocaleString('es-CL')}</td>
     <td style="text-align:right">$${totCobrado.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#16a34a">$${totSaldo.toLocaleString('es-CL')}</td>
+    <td></td>
   </tr></tfoot></table></div>`;
   document.getElementById('lista-gastos').innerHTML = html;
 }
