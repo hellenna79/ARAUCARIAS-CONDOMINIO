@@ -7,7 +7,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
 :root{--verde:#1a7a4a;--verde2:#145c38;--verde3:#e8f5ee;--verde4:#0f4a2c;--gris:#f4f6f4;--borde:#d0e4d8;--texto:#1a2e1f;--texto2:#4a6b52}
@@ -129,8 +128,6 @@ tr:hover td{background:#fafcfb}
       <div class="nav-item" onclick="navegar('flujo',this)"><span class="nav-icon">📈</span> Flujo de caja</div>
       <div class="nav-item" onclick="navegar('reportes',this)"><span class="nav-icon">📋</span> Reportes</div>
       <div class="nav-item" onclick="navegar('morosos',this)"><span class="nav-icon">🔴</span> Morosos</div>
-      <div class="nav-item" onclick="navegar('balance',this)"><span class="nav-icon">📊</span> Balance Mensual</div>
-      <div class="nav-item" onclick="navegar('cierre',this)"><span class="nav-icon">🔒</span> Cierre de Mes</div>
     </div>
 
     <div class="nav-section">
@@ -223,7 +220,7 @@ function navegar(seccion, el) {
   const titulos = {
     panel:'Panel principal', publicaciones:'Publicaciones', recaudacion:'Recaudación',
     egresos:'Egresos', gastos:'Gastos comunes', cartas:'Cartas de cobro',
-    conciliacion:'Conciliación bancaria', libro:'Libro diario', flujo:'Flujo de caja', balance:'Balance Mensual', cierre:'Cierre de Mes',
+    conciliacion:'Conciliación bancaria', libro:'Libro diario', flujo:'Flujo de caja',
     reportes:'Reportes', residentes:'Residentes', incidencias:'Incidencias',
     mantenciones:'Mantenciones', votaciones:'Votaciones', biblioteca:'Biblioteca',
     correos:'Registro de correos', certificados:'Certificados', acceso:'Control de acceso',
@@ -240,7 +237,8 @@ function navegar(seccion, el) {
   if (seccion === 'egresos') { mostrarEgresos(); return; }
   if (seccion === 'cartas') { mostrarCartas(); return; }
   if (seccion === 'libro') { mostrarLibroDiario(); return; }
-  if (seccion === 'conciliacion') { mostrarConciliacion(); return; }  if (seccion === 'balance') { mostrarBalance(); return; }  if (seccion === 'cierre') { mostrarCierreMes(); return; }  if (seccion === 'flujo') { mostrarFlujoCaja(); return; }
+  if (seccion === 'conciliacion') { mostrarConciliacion(); return; }
+  if (seccion === 'flujo') { mostrarFlujoCaja(); return; }
   if (seccion === 'reportes') { mostrarReportes(); return; }
   if (seccion === 'morosos') { mostrarMorosos(); return; }
   if (seccion === 'incidencias') { mostrarIncidencias(); return; }
@@ -411,23 +409,9 @@ function guardarResidente() {
 function mostrarRecaudacion() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-      <input id="filtro-unidad-pago" type="number" placeholder="Filtrar unidad…" onchange="cargarPagos()" style="padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px;width:130px">
-      <select id="filtro-vista-pago" onchange="cargarPagos()" style="padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <option value="todos">Todos los pagos</option>
-        <option value="agrupado">Agrupar por unidad</option>
-        <option value="ultimo">Solo último pago por unidad</option>
-      </select>
-      <select id="filtro-antiguos-pago" onchange="cargarPagos()" style="padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <option value="recientes">Más recientes primero</option>
-        <option value="antiguos">Más antiguos primero</option>
-      </select>
-      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-verde" onclick="abrirImportarExcelRecaudacion()">📥 Importar Excel</button>
-        <button class="btn btn-verde" onclick="abrirModalPago()">+ Registrar pago</button>
-        <button class="btn btn-verde" style="background:#dc2626" onclick="abrirEliminarLote()">🗑️ Eliminar lote</button>
-        <button class="btn btn-verde" style="background:#1d4ed8" onclick="mostrarEstadoCuenta()">📊 Estado de cuenta</button>
-      </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-verde" onclick="abrirModalPago()">+ Registrar pago / ajuste</button>
+      <button class="btn btn-verde" style="background:#1d4ed8" onclick="mostrarEstadoCuenta()">📊 Estado de cuenta por unidad</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Pagos y movimientos</h3></div>
@@ -571,366 +555,21 @@ function imprimirEstadoCuenta() {
 }
 
 function cargarPagos() {
-  const filtroUnidad = (document.getElementById('filtro-unidad-pago')||{}).value||'';
-  const filtroVista = (document.getElementById('filtro-vista-pago')||{}).value||'todos';
-  const filtroAntiguos = (document.getElementById('filtro-antiguos-pago')||{}).value||'recientes';
-
-  db.collection('pagos').orderBy('fecha','asc').get().then(snap => {
+  db.collection('pagos').orderBy('fecha','desc').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay pagos registrados</div>'; return; }
-
-    let todos = [];
-    snap.forEach(d => { todos.push({...d.data(), _id: d.id}); });
-
-    // Ordenar por fecha asc (ya viene así) o desc según filtro
-    if (filtroAntiguos === 'antiguos') {
-      todos.sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
-    } else {
-      todos.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
-    }
-
-    // Filtrar por unidad
-    if (filtroUnidad) todos = todos.filter(p => String(p.unidad||'') === filtroUnidad);
-
-    // Agrupar por unidad y solo mostrar el más reciente
-    if (filtroVista === 'ultimo') {
-      const porUnidad = {};
-      // Recorrer en orden cronológico para quedarnos con el más nuevo
-      [...todos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).forEach(p => {
-        const u = p.unidad||'sin-unidad';
-        if (!porUnidad[u]) porUnidad[u] = p;
-      });
-      todos = Object.values(porUnidad).sort((a,b) => parseInt(a.unidad||0)-parseInt(b.unidad||0));
-    }
-
-    // Agrupar por unidad para mostrar separadas
-    if (filtroVista === 'agrupado' || filtroVista === 'ultimo') {
-      const grupos = {};
-      todos.forEach(p => {
-        const u = p.unidad||'sin-unidad';
-        if (!grupos[u]) grupos[u] = [];
-        grupos[u].push(p);
-      });
-      const unidadesOrdenadas = Object.keys(grupos).sort((a,b) => parseInt(a)-parseInt(b));
-      let html = '';
-      unidadesOrdenadas.forEach(u => {
-        html += `<div style="margin-bottom:16px">
-          <div style="background:#1a7a4a;color:white;padding:8px 16px;border-radius:8px 8px 0 0;font-weight:700;font-size:13px">🏠 Unidad ${u}</div>
-          <table style="width:100%;border-collapse:collapse">
-          <thead><tr style="background:#e8f5ee"><th style="padding:9px 12px;text-align:left;font-size:12px">Fecha</th><th style="padding:9px 12px;text-align:left;font-size:12px">Concepto</th><th style="padding:9px 12px;text-align:right;font-size:12px">Monto</th><th style="padding:9px 12px;text-align:left;font-size:12px">Forma</th><th style="padding:9px 12px;font-size:12px">Acciones</th></tr></thead><tbody>`;
-        grupos[u].forEach(p => {
-          html += `<tr style="border-bottom:1px solid var(--borde)">
-            <td style="padding:9px 12px;font-size:13px">${p.fecha||'—'}</td>
-            <td style="padding:9px 12px;font-size:13px">${p.concepto||'—'}</td>
-            <td style="padding:9px 12px;font-size:13px;text-align:right">$${Number(p.monto||0).toLocaleString('es-CL')}</td>
-            <td style="padding:9px 12px;font-size:13px"><span class="badge badge-gris">${p.forma||'—'}</span></td>
-            <td style="padding:9px 12px;white-space:nowrap">
-              <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick='abrirEditarPago(${JSON.stringify({id:p._id,...p}).replace(/'/g,"&#39;")})'>✏️</button>
-              <button class="btn btn-sm" style="background:#dc2626;color:white;margin-right:4px" onclick="eliminarPago('${p._id}','${p.unidad||''}','${p.fecha||''}')">🗑️</button>
-              <button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick="verTransaccionesUnidad('${u}')">📋</button>
-            </td>
-          </tr>`;
-        });
-        html += '</tbody></table></div>';
-      });
-      document.getElementById('lista-pagos').innerHTML = html || '<div style="padding:24px;text-align:center;color:#999">Sin resultados</div>';
-      return;
-    }
-
-    // Vista plana (por defecto)
-    let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th><th style="text-align:center">Acciones</th></tr></thead><tbody>';
-    todos.forEach(p => {
-      html += `<tr>
-        <td>${p.fecha||'—'}</td>
-        <td><strong>${p.unidad||'—'}</strong></td>
-        <td>${p.concepto||'—'}</td>
-        <td>$${Number(p.monto||0).toLocaleString('es-CL')}</td>
-        <td><span class="badge badge-gris">${p.forma||'—'}</span></td>
-        <td style="text-align:center;white-space:nowrap">
-          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick='abrirEditarPago(${JSON.stringify({id:p._id,...p}).replace(/'/g,"&#39;")})'>✏️</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:white;margin-right:4px" onclick="eliminarPago('${p._id}','${p.unidad||''}','${p.fecha||''}')">🗑️</button>
-          <button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick="verTransaccionesUnidad('${p.unidad||''}')">📋</button>
-        </td>
-      </tr>`;
+    let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th></tr></thead><tbody>';
+    snap.forEach(d => {
+      const p = d.data();
+      html += `<tr><td>${p.fecha||'—'}</td><td>${p.unidad||'—'}</td><td>${p.concepto||'—'}</td><td>$${Number(p.monto||0).toLocaleString('es-CL')}</td><td><span class="badge badge-gris">${p.forma||'—'}</span></td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('lista-pagos').innerHTML = html;
   }).catch(() => { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Sin pagos registrados aún</div>'; });
 }
 
-// ===== MÓDULO TRANSACCIONES POR UNIDAD =====
-function verTransaccionesUnidad(unidad) {
-  if (!unidad) { alert('Unidad no especificada'); return; }
-  const existente = document.getElementById('modal-transacciones');
-  if (existente) existente.remove();
-  const modal = document.createElement('div');
-  modal.id = 'modal-transacciones';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML = `
-    <div style="background:white;border-radius:16px;width:900px;max-width:97vw;max-height:92vh;overflow-y:auto">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center;background:#1a7a4a;border-radius:16px 16px 0 0">
-        <span style="font-weight:700;font-size:15px;color:white">📋 Historial de transacciones — Unidad ${unidad}</span>
-        <div style="display:flex;gap:8px">
-          <button onclick="imprimirTransacciones('${unidad}')" style="background:white;color:#1a7a4a;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🖨️ Imprimir</button>
-          <button onclick="document.getElementById('modal-transacciones').remove()" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px">✖ Cerrar</button>
-        </div>
-      </div>
-      <div style="padding:16px 20px" id="contenido-transacciones">
-        <div style="text-align:center;padding:24px;color:#999">Cargando transacciones...</div>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  cargarTransaccionesUnidad(unidad);
-}
-
-async function cargarTransaccionesUnidad(unidad) {
-  const div = document.getElementById('contenido-transacciones');
-  try {
-    const [rSnap, pagosSnap, gcSnap] = await Promise.all([
-      db.collection('residentes').where('unidad','==',String(unidad)).get(),
-      db.collection('pagos').where('unidad','==',String(unidad)).orderBy('fecha','asc').get(),
-      db.collection('gastos_comunes').where('unidad','==',String(unidad)).orderBy('vencimiento','asc').get()
-    ]);
-    const residente = rSnap.empty ? {nombre:'—', deuda:0, intereses:0} : rSnap.docs[0].data();
-
-    // Combinar movimientos
-    let movs = [];
-    // Cargos: gastos comunes emitidos
-    gcSnap.forEach(d => {
-      const g = d.data();
-      movs.push({fecha: g.vencimiento||g.fechaEmision||'', tipo:'cargo', descripcion:`Gasto común ${g.mes||''}`, cargo:Number(g.monto||0), abono:0});
-    });
-    // También agregar GC del mes desde la tabla estática si no hay datos en Firestore
-    if (gcSnap.empty) {
-      const gcData = GASTOS_JULIO_2026.find(g => String(g.unidad)===String(unidad));
-      if (gcData) {
-        movs.push({fecha:'2026-07-01', tipo:'cargo', descripcion:`Gasto común julio 2026 (GC egresos)`, cargo:gcData.totalMes, abono:0});
-        if (gcData.capitalAtrasado > 0) movs.push({fecha:'2026-07-01', tipo:'cargo', descripcion:`Capital atrasado`, cargo:gcData.capitalAtrasado, abono:0});
-        if (gcData.intereses > 0) movs.push({fecha:'2026-07-01', tipo:'cargo', descripcion:`Intereses por mora`, cargo:gcData.intereses, abono:0});
-      }
-    }
-    // Abonos: pagos registrados
-    pagosSnap.forEach(d => {
-      const p = d.data();
-      const esAjuste = p.tipo === 'Ajuste';
-      movs.push({fecha:p.fecha||'', tipo:esAjuste?'ajuste':'abono', descripcion:p.concepto||'Pago', cargo:0, abono:Number(p.monto||0), esAjuste, forma:p.forma||''});
-    });
-
-    // Ordenar por fecha asc
-    movs.sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
-
-    let saldo = (residente.deuda||0) + (residente.intereses||0);
-    // Recalcular saldo desde cero con los movimientos
-    let saldoAcum = 0;
-    // Determinar saldo inicial
-    const deudaTotal = (residente.deuda||0)+(residente.intereses||0);
-
-    let html = `
-      <div style="margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-        <div><strong>Residente:</strong> ${residente.nombre||'—'}</div>
-        <div><strong>Unidad:</strong> ${unidad}</div>
-        <div><strong>Deuda registrada:</strong> <span style="color:#dc2626;font-weight:700">$${deudaTotal.toLocaleString('es-CL')}</span></div>
-      </div>
-      <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead><tr style="background:#1a7a4a;color:white">
-          <th style="padding:10px 12px;text-align:left">Fecha</th>
-          <th style="padding:10px 12px;text-align:left">Descripción</th>
-          <th style="padding:10px 12px;text-align:right">Cargo</th>
-          <th style="padding:10px 12px;text-align:right">Abono</th>
-          <th style="padding:10px 12px;text-align:right">Saldo</th>
-        </tr></thead><tbody>`;
-
-    // Fila saldo inicial desde BD
-    html += `<tr style="background:#e8f5ee">
-      <td style="padding:9px 12px">—</td>
-      <td style="padding:9px 12px"><strong>Saldo según registro de residentes</strong></td>
-      <td style="padding:9px 12px;text-align:right"></td>
-      <td style="padding:9px 12px;text-align:right"></td>
-      <td style="padding:9px 12px;text-align:right;font-weight:700">$${deudaTotal.toLocaleString('es-CL')}</td>
-    </tr>`;
-    saldoAcum = deudaTotal;
-
-    if (movs.length === 0) {
-      html += `<tr><td colspan="5" style="padding:20px;text-align:center;color:#999">Sin transacciones registradas para esta unidad</td></tr>`;
-    } else {
-      movs.forEach(m => {
-        const [y,mo,d] = (m.fecha||'').split('-');
-        const fechaFmt = m.fecha ? `${d||''}/${mo||''}/${y||''}` : '—';
-        if (!m.esAjuste) {
-          saldoAcum += m.cargo - m.abono;
-        }
-        const bgRow = m.esAjuste ? '#fef9c3' : m.tipo==='cargo' ? '#fff5f5' : '';
-        html += `<tr style="border-bottom:1px solid #eee;background:${bgRow}">
-          <td style="padding:9px 12px">${fechaFmt}</td>
-          <td style="padding:9px 12px">${m.descripcion}${m.esAjuste?' <span style="font-size:11px;color:#854d0e">(ajuste)</span>':''}${m.forma?' — '+m.forma:''}</td>
-          <td style="padding:9px 12px;text-align:right;color:#dc2626">${m.cargo>0?'$'+m.cargo.toLocaleString('es-CL'):''}</td>
-          <td style="padding:9px 12px;text-align:right;color:#16a34a">${m.abono>0?'$'+m.abono.toLocaleString('es-CL'):''}</td>
-          <td style="padding:9px 12px;text-align:right;font-weight:600">${m.esAjuste?'(ajuste)':'$'+saldoAcum.toLocaleString('es-CL')}</td>
-        </tr>`;
-      });
-    }
-    html += `</tbody><tfoot><tr style="background:#0f4a2c;color:white">
-      <td colspan="4" style="padding:10px 12px;font-weight:700">SALDO CALCULADO ACTUAL</td>
-      <td style="padding:10px 12px;text-align:right;font-weight:700">$${saldoAcum.toLocaleString('es-CL')}</td>
-    </tr></tfoot></table></div>`;
-    div.innerHTML = html;
-  } catch(e) {
-    div.innerHTML = `<div style="padding:24px;text-align:center;color:#dc2626">Error al cargar: ${e.message}</div>`;
-  }
-}
-
-function imprimirTransacciones(unidad) {
-  const contenido = document.getElementById('contenido-transacciones').innerHTML;
-  const v = window.open('','_blank');
-  v.document.write(`<!DOCTYPE html><html><head><title>Transacciones Unidad ${unidad}</title><style>
-    body{font-family:Arial,sans-serif;font-size:12px;padding:30px;max-width:800px;margin:0 auto}
-    table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd}th{background:#1a7a4a;color:white}
-    @media print{body{padding:20px}}
-  </style></head><body>
-    <h2 style="color:#1a7a4a">Historial de Transacciones — Unidad ${unidad}</h2>
-    <p style="color:#666">Condominio Las Araucarias · ${new Date().toLocaleDateString('es-CL')}</p>
-    ${contenido}
-  </body></html>`);
-  v.document.close();
-  setTimeout(()=>v.print(),500);
-}
-
-function abrirEditarPago(p) {
-  const existente = document.getElementById('modal-editar-pago');
-  if (existente) existente.remove();
-  const modal = document.createElement('div');
-  modal.id = 'modal-editar-pago';
-  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:420px;max-width:92vw">
-      <h3 style="margin-bottom:20px;color:var(--verde4)">✏️ Editar pago — Unidad ${p.unidad||''}</h3>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <input id="ep-unidad" placeholder="N° unidad" value="${p.unidad||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <select id="ep-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <option value="Pago" ${(p.tipo||'Pago')==='Pago'?'selected':''}>Pago</option>
-          <option value="Ajuste" ${p.tipo==='Ajuste'?'selected':''}>Ajuste (no suma al saldo)</option>
-        </select>
-        <input id="ep-concepto" placeholder="Concepto" value="${p.concepto||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <input id="ep-monto" type="number" placeholder="Monto ($)" value="${p.monto||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <input id="ep-fecha" type="date" value="${p.fecha||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <select id="ep-forma" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <option ${(p.forma||'')==='Transferencia'?'selected':''}>Transferencia</option>
-          <option ${p.forma==='Efectivo'?'selected':''}>Efectivo</option>
-          <option ${p.forma==='Cheque'?'selected':''}>Cheque</option>
-          <option ${p.forma==='Débito'?'selected':''}>Débito</option>
-          <option ${p.forma==='Ajuste/Compensación'?'selected':''}>Ajuste/Compensación</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-editar-pago').remove()">Cancelar</button>
-        <button class="btn btn-verde" onclick="guardarEdicionPago('${p.id}')">💾 Guardar cambios</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-}
-
-function guardarEdicionPago(id) {
-  const datos = {
-    unidad: document.getElementById('ep-unidad').value,
-    tipo: document.getElementById('ep-tipo').value,
-    concepto: document.getElementById('ep-concepto').value,
-    monto: Number(document.getElementById('ep-monto').value),
-    fecha: document.getElementById('ep-fecha').value,
-    forma: document.getElementById('ep-forma').value,
-  };
-  if (!datos.unidad || !datos.monto) { alert('Ingresa al menos la unidad y el monto'); return; }
-  db.collection('pagos').doc(id).update(datos)
-    .then(() => { document.getElementById('modal-editar-pago').remove(); cargarPagos(); })
-    .catch(e => alert('Error al guardar: ' + e.message));
-}
-
-function abrirEliminarLote() {
-  const existente = document.getElementById('modal-eliminar-lote');
-  if (existente) existente.remove();
-  const modal = document.createElement('div');
-  modal.id = 'modal-eliminar-lote';
-  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
-  // Calcular meses disponibles
-  modal.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:500px;max-width:94vw">
-      <h3 style="margin-bottom:6px;color:#dc2626">🗑️ Eliminar pagos por lote</h3>
-      <p style="font-size:13px;color:#666;margin-bottom:18px">Puedes filtrar y eliminar registros por mes/año, unidad o un rango de fechas. <strong>Esta acción es irreversible.</strong></p>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
-        <div style="display:flex;gap:8px;align-items:center">
-          <label style="font-size:13px;width:110px">Mes/Año:</label>
-          <input id="el-mes" type="month" style="flex:1;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <label style="font-size:13px;width:110px">Unidad (opc.):</label>
-          <input id="el-unidad" placeholder="Ej: 5  (dejar vacío = todas)" style="flex:1;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap">
-        <button class="btn" style="background:#f1f5f9;color:#1e293b" onclick="previsualizarLote()">🔍 Previsualizar registros</button>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-outline" onclick="document.getElementById('modal-eliminar-lote').remove()">Cancelar</button>
-          <button id="btn-confirmar-eliminar-lote" class="btn" style="background:#dc2626;color:white;display:none" onclick="confirmarEliminarLote()">🗑️ Eliminar estos registros</button>
-        </div>
-      </div>
-      <div id="lote-preview" style="margin-top:14px;max-height:280px;overflow-y:auto;font-size:12px"></div>
-    </div>`;
-  document.body.appendChild(modal);
-}
-
-let _loteIds = [];
-function previsualizarLote() {
-  const mes = document.getElementById('el-mes').value; // "YYYY-MM"
-  const unidad = document.getElementById('el-unidad').value.trim();
-  const preview = document.getElementById('lote-preview');
-  const btnElim = document.getElementById('btn-confirmar-eliminar-lote');
-  _loteIds = [];
-  btnElim.style.display = 'none';
-  if (!mes) { preview.innerHTML = '<p style="color:#dc2626">Selecciona un mes/año para filtrar.</p>'; return; }
-  preview.innerHTML = '<p style="color:#666">⏳ Buscando registros...</p>';
-  db.collection('pagos').get().then(snap => {
-    const encontrados = [];
-    snap.forEach(d => {
-      const p = d.data();
-      const fechaMes = (p.fecha||'').slice(0,7); // "YYYY-MM"
-      const coincideMes = fechaMes === mes;
-      const coincideUnidad = !unidad || String(p.unidad||'') === unidad;
-      if (coincideMes && coincideUnidad) encontrados.push({id:d.id, ...p});
-    });
-    if (!encontrados.length) { preview.innerHTML = '<p style="color:#999;padding:10px">No se encontraron registros para ese criterio.</p>'; return; }
-    _loteIds = encontrados.map(r => r.id);
-    let html = `<div style="margin-bottom:10px;font-weight:600;color:#dc2626">⚠️ Se encontraron <strong>${encontrados.length} registros</strong> que serán eliminados:</div>`;
-    html += '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#fee2e2"><th style="padding:5px">Fecha</th><th style="padding:5px">Unidad</th><th style="padding:5px">Concepto</th><th style="padding:5px;text-align:right">Monto</th></tr></thead><tbody>';
-    encontrados.slice(0,20).forEach(r => {
-      html += `<tr style="border-bottom:1px solid #fecaca"><td style="padding:4px 5px">${r.fecha||'—'}</td><td style="padding:4px 5px;text-align:center">${r.unidad||'—'}</td><td style="padding:4px 5px">${r.concepto||'—'}</td><td style="padding:4px 5px;text-align:right">$${Number(r.monto||0).toLocaleString('es-CL')}</td></tr>`;
-    });
-    if (encontrados.length > 20) html += `<tr><td colspan="4" style="padding:6px;text-align:center;color:#999">...y ${encontrados.length-20} registros más</td></tr>`;
-    html += '</tbody></table>';
-    preview.innerHTML = html;
-    btnElim.style.display = 'inline-block';
-    btnElim.textContent = `🗑️ Eliminar ${_loteIds.length} registros`;
-  });
-}
-
-async function confirmarEliminarLote() {
-  if (!_loteIds.length) return;
-  if (!confirm(`¿Estás segura de eliminar ${_loteIds.length} registros?\n\nEsta acción NO se puede deshacer.`)) return;
-  const btn = document.getElementById('btn-confirmar-eliminar-lote');
-  const preview = document.getElementById('lote-preview');
-  btn.disabled = true;
-  preview.innerHTML = '<p style="color:#666">⏳ Eliminando registros...</p>';
-  let ok = 0;
-  for (const id of _loteIds) {
-    try { await db.collection('pagos').doc(id).delete(); ok++; } catch(e) {}
-  }
-  preview.innerHTML = `<p style="color:#166534;font-weight:600">✅ Se eliminaron ${ok} registros correctamente.</p>`;
-  _loteIds = [];
-  btn.style.display = 'none';
-  setTimeout(() => { const m = document.getElementById('modal-eliminar-lote'); if(m) m.remove(); cargarPagos(); }, 1800);
-}
-
 function abrirModalPago() { document.getElementById('modal-pago').style.display = 'flex'; document.getElementById('p-fecha').value=new Date().toISOString().split('T')[0]; }
 function cerrarModalPago() { document.getElementById('modal-pago').style.display = 'none'; }
-async function guardarPago() {
+function guardarPago() {
   const tipo = document.getElementById('p-tipo').value;
   const datos = {
     unidad: document.getElementById('p-unidad').value,
@@ -939,58 +578,9 @@ async function guardarPago() {
     monto: Number(document.getElementById('p-monto').value),
     fecha: document.getElementById('p-fecha').value,
     forma: document.getElementById('p-forma').value,
-    fechaRegistro: new Date().toISOString()
   };
   if (!datos.unidad || !datos.monto) { alert('Ingresa al menos la unidad y el monto'); return; }
-
-  try {
-    // PUNTO 8: Si es Ajuste/Compensación, solo se descuenta de la unidad, NO suma a cuentas del condominio
-    const esAjuste = tipo === 'Ajuste';
-
-    // Guardar en colección pagos
-    const ref = await db.collection('pagos').add(datos);
-
-    // Descontar deuda del residente al registrar pago O ajuste
-    const rSnap = await db.collection('residentes').where('unidad','==',String(datos.unidad)).get();
-    if (!rSnap.empty) {
-      const rDoc = rSnap.docs[0];
-      const r = rDoc.data();
-      let nuevaDeuda = (r.deuda||0);
-      let nuevosIntereses = (r.intereses||0);
-      let montoRestante = datos.monto;
-      // Primero descontar intereses, luego capital
-      if (montoRestante >= nuevosIntereses) {
-        montoRestante -= nuevosIntereses;
-        nuevosIntereses = 0;
-      } else {
-        nuevosIntereses -= montoRestante;
-        montoRestante = 0;
-      }
-      nuevaDeuda = Math.max(0, nuevaDeuda - montoRestante);
-      await rDoc.ref.update({ deuda: nuevaDeuda, intereses: nuevosIntereses });
-    }
-
-    // Auto-registro en libro diario (solo si NO es ajuste, punto 8)
-    if (!esAjuste) {
-      await db.collection('libro_diario').add({
-        fecha: datos.fecha,
-        glosa: `Pago GC unidad ${datos.unidad} - ${datos.concepto||''}`,
-        cuentaDebe: datos.forma==='Efectivo'?'Caja chica':'Banco Estado',
-        montoDebe: datos.monto,
-        cuentaHaber: 'Ingresos gastos comunes',
-        montoHaber: datos.monto,
-        documento: '',
-        origen: 'pago_automatico',
-        referenciaId: ref.id
-      });
-    }
-    // Si es ajuste: solo se registra en pagos y se descuenta de la unidad (hecho arriba)
-    // NO se registra en libro diario ni suma a cuentas del condominio
-
-    cerrarModalPago();
-    cargarPagos();
-    alert(`✅ ${esAjuste?'Ajuste':'Pago'} registrado correctamente.${!esAjuste?' Asiento contable generado automáticamente.':' (Solo descuento en unidad, no afecta cuentas del condominio)'}`);
-  } catch(e) { alert('Error: ' + e.message); }
+  db.collection('pagos').add(datos).then(() => { cerrarModalPago(); cargarPagos(); }).catch(e => alert('Error: ' + e.message));
 }
 
 // ===================== GASTOS COMUNES =====================
@@ -1076,16 +666,12 @@ function mostrarGastos() {
   const c = document.getElementById('content');
   c.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-outline" onclick="exportarGastosExcel()">📊 Exportar Excel</button>
-      <button class="btn btn-verde" style="background:#1d4ed8" onclick="importarGastosExcel()">📥 Importar Excel</button>
+      <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
       <button class="btn btn-verde" onclick="abrirModalGasto()">+ Nuevo gasto común</button>
     </div>
     <div class="tabla-wrap">
-      <div class="tabla-header" style="display:flex;justify-content:space-between;align-items:center">
-        <h3>Gastos comunes</h3>
-        <span style="font-size:12px;color:var(--texto2)" id="gc-subtitulo">Cargando...</span>
-      </div>
-      <div id="lista-gastos"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
+      <div class="tabla-header"><h3>Gastos comunes — Julio 2026</h3><span style="font-size:12px;color:var(--texto2)">75 unidades · Cargados desde planilla oficial</span></div>
+      <div id="lista-gastos"></div>
     </div>
     <div id="modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center">
       <div style="background:white;border-radius:16px;padding:28px;width:400px;max-width:90vw">
@@ -1101,85 +687,120 @@ function mostrarGastos() {
           <button class="btn btn-verde" onclick="guardarGasto()">Emitir</button>
         </div>
       </div>
+    </div>
+
+    <div id="modal-editar-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150;align-items:center;justify-content:center">
+      <div style="background:white;border-radius:16px;padding:28px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto">
+        <h3 style="margin-bottom:6px;color:var(--verde4)">✏️ Editar gasto común</h3>
+        <p id="eg-unidad" style="font-size:13px;color:var(--texto2);margin-bottom:16px;font-weight:600"></p>
+        <input type="hidden" id="eg-idx">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Prorrateo ($)</label>
+            <input id="eg-prorrateo" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">GC Egresos ($)</label>
+            <input id="eg-gcEgresos" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Total Mes ($)</label>
+            <input id="eg-totalMes" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#dc2626;display:block;margin-bottom:4px">Capital Atrasado ($)</label>
+            <input id="eg-capitalAtrasado" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#f97316;display:block;margin-bottom:4px">Intereses ($)</label>
+            <input id="eg-intereses" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Abonos ($)</label>
+            <input id="eg-abonos" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--verde4);display:block;margin-bottom:4px">Total Cobrado ($)</label>
+            <input id="eg-totalCobrado" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#16a34a;display:block;margin-bottom:4px">Saldo Favor ($)</label>
+            <input id="eg-saldoFavor" type="number" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="cerrarModalEditarGasto()">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarEdicionGasto()">💾 Guardar cambios</button>
+        </div>
+      </div>
     </div>`;
   renderGastosTabla();
 }
 
-// Variable global para datos importados de gastos
-let _datosGastosImportados = null;
-
-async function renderGastosTabla() {
-  const div = document.getElementById('lista-gastos');
-  const subtitulo = document.getElementById('gc-subtitulo');
-
-  // Intentar cargar desde Firestore primero
-  try {
-    const gcSnap = await db.collection('gastos_comunes_planilla').orderBy('unidad').get();
-    
-    if (!gcSnap.empty) {
-      // Cargar pagos para cruzar saldos reales
-      const pagosSnap = await db.collection('pagos').get();
-      const pagosMap = {};
-      pagosSnap.forEach(d => {
-        const p = d.data();
-        const u = String(p.unidad||'');
-        if (!pagosMap[u]) pagosMap[u] = 0;
-        if (p.tipo !== 'Ajuste') pagosMap[u] += Number(p.monto||0);
-      });
-
-      const datos = [];
-      gcSnap.forEach(d => datos.push({...d.data(), _id: d.id}));
-      if(subtitulo) subtitulo.textContent = `${datos.length} unidades · Importado desde planilla`;
-      renderTablaDatos(datos, pagosMap, div);
-      return;
-    }
-  } catch(e) {}
-
-  // Si no hay datos en Firestore, usar la tabla estática
-  if(subtitulo) subtitulo.textContent = `${GASTOS_JULIO_2026.length} unidades · Planilla julio 2026`;
-  renderTablaDatos(GASTOS_JULIO_2026, {}, div);
+function editarGasto(idx) {
+  const g = GASTOS_JULIO_2026[idx];
+  document.getElementById('eg-idx').value = idx;
+  document.getElementById('eg-unidad').textContent = g.unidad + ' — ' + g.residente;
+  document.getElementById('eg-prorrateo').value = g.prorrateo;
+  document.getElementById('eg-gcEgresos').value = g.gcEgresos;
+  document.getElementById('eg-totalMes').value = g.totalMes;
+  document.getElementById('eg-capitalAtrasado').value = g.capitalAtrasado;
+  document.getElementById('eg-intereses').value = g.intereses;
+  document.getElementById('eg-abonos').value = g.abonos;
+  document.getElementById('eg-totalCobrado').value = g.totalCobrado;
+  document.getElementById('eg-saldoFavor').value = g.saldoFavor;
+  document.getElementById('modal-editar-gasto').style.display = 'flex';
 }
 
-function renderTablaDatos(datos, pagosMap, div) {
-  // Detectar columnas disponibles
-  const tieneCargos = datos.some(g => g.cargos !== undefined);
-  
+function guardarEdicionGasto() {
+  const idx = parseInt(document.getElementById('eg-idx').value);
+  const g = GASTOS_JULIO_2026[idx];
+  g.prorrateo       = Number(document.getElementById('eg-prorrateo').value) || 0;
+  g.gcEgresos       = Number(document.getElementById('eg-gcEgresos').value) || 0;
+  g.totalMes        = Number(document.getElementById('eg-totalMes').value) || 0;
+  g.capitalAtrasado = Number(document.getElementById('eg-capitalAtrasado').value) || 0;
+  g.intereses       = Number(document.getElementById('eg-intereses').value) || 0;
+  g.abonos          = Number(document.getElementById('eg-abonos').value) || 0;
+  g.totalCobrado    = Number(document.getElementById('eg-totalCobrado').value) || 0;
+  g.saldoFavor      = Number(document.getElementById('eg-saldoFavor').value) || 0;
+  document.getElementById('modal-editar-gasto').style.display = 'none';
+  renderGastosTabla();
+}
+
+function cerrarModalEditarGasto() {
+  document.getElementById('modal-editar-gasto').style.display = 'none';
+}
+
+function renderGastosTabla() {
+  // Ordenar por número de unidad (correlativo menor a mayor)
+  const gastosOrdenados = [...GASTOS_JULIO_2026].sort((a, b) => Number(a.unidad) - Number(b.unidad));
+
   let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
-    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>GC Egresos</th><th>Total Mes</th>
-    <th>Capital Atrasado</th><th>Intereses</th>${tieneCargos?'<th>Cargos</th>':''}
-    <th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th>Pagado Sistema</th><th>Saldo Real</th>
+    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>GC Egresos</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th></th>
   </tr></thead><tbody>`;
-
-  let totProrrateo=0, totCapital=0, totIntereses=0, totCobrado=0, totSaldo=0, totCargos=0;
-
-  datos.forEach(g => {
-    const deudaTotal = (g.capitalAtrasado||0) + (g.intereses||0);
-    const rowColor = deudaTotal > 66000 ? '#fff5f5' : (g.saldoFavor||0) > 0 ? '#f0fdf4' : '';
-    const pagadoSistema = pagosMap[String(g.unidad||'')] || 0;
-    const saldoReal = (g.totalCobrado||0) - pagadoSistema;
-    totProrrateo += g.prorrateo||0;
-    totCapital += g.capitalAtrasado||0;
-    totIntereses += g.intereses||0;
-    totCobrado += g.totalCobrado||0;
-    totSaldo += g.saldoFavor||0;
-    totCargos += g.cargos||0;
+  gastosOrdenados.forEach(g => {
+    const idx = GASTOS_JULIO_2026.indexOf(g);
+    const deudaTotal = g.capitalAtrasado + g.intereses;
+    const rowColor = deudaTotal > 66000 ? '#fff5f5' : g.saldoFavor > 0 ? '#f0fdf4' : '';
     html += `<tr style="background:${rowColor}">
       <td><strong>${g.unidad}</strong></td>
-      <td>${g.residente||'—'}</td>
-      <td style="text-align:right">$${(g.prorrateo||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${(g.gcEgresos||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${(g.totalMes||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${(g.capitalAtrasado||0)>0?'color:#dc2626;font-weight:600':''}">$${(g.capitalAtrasado||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${(g.intereses||0)>0?'color:#f97316':''}">$${(g.intereses||0).toLocaleString('es-CL')}</td>
-      ${tieneCargos?`<td style="text-align:right">$${(g.cargos||0).toLocaleString('es-CL')}</td>`:''}
-      <td style="text-align:right">$${(g.abonos||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right;font-weight:600">$${(g.totalCobrado||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${(g.saldoFavor||0)>0?'color:#16a34a;font-weight:600':''}">$${(g.saldoFavor||0).toLocaleString('es-CL')}</td>
-      <td style="text-align:right;color:#1d4ed8">$${pagadoSistema.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;font-weight:700;color:${saldoReal>0?'#dc2626':'#16a34a'}">$${saldoReal.toLocaleString('es-CL')}</td>
+      <td>${g.residente}</td>
+      <td style="text-align:right">$${g.prorrateo.toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${g.gcEgresos.toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${g.totalMes.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.capitalAtrasado>0?'color:#dc2626;font-weight:600':''}">$${g.capitalAtrasado.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.intereses>0?'color:#f97316':''}">$${g.intereses.toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${g.abonos.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;font-weight:600">$${g.totalCobrado.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${g.saldoFavor>0?'color:#16a34a;font-weight:600':''}">$${g.saldoFavor.toLocaleString('es-CL')}</td>
+      <td><button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde)" onclick="editarGasto(${idx})">✏️ Editar</button></td>
     </tr>`;
   });
-
+  const totProrrateo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.prorrateo,0);
+  const totCapital = GASTOS_JULIO_2026.reduce((s,g)=>s+g.capitalAtrasado,0);
+  const totIntereses = GASTOS_JULIO_2026.reduce((s,g)=>s+g.intereses,0);
+  const totCobrado = GASTOS_JULIO_2026.reduce((s,g)=>s+g.totalCobrado,0);
+  const totSaldo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.saldoFavor,0);
   html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700">
     <td colspan="2">TOTALES</td>
     <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
@@ -1187,153 +808,11 @@ function renderTablaDatos(datos, pagosMap, div) {
     <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#dc2626">$${totCapital.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#f97316">$${totIntereses.toLocaleString('es-CL')}</td>
-    ${tieneCargos?`<td style="text-align:right">$${totCargos.toLocaleString('es-CL')}</td>`:''}
     <td style="text-align:right">$0</td>
     <td style="text-align:right">$${totCobrado.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#16a34a">$${totSaldo.toLocaleString('es-CL')}</td>
-    <td colspan="2"></td>
   </tr></tfoot></table></div>`;
-  div.innerHTML = html;
-}
-
-function importarGastosExcel() {
-  const m = document.createElement('div');
-  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
-      <h3 style="margin-bottom:6px;color:#1d4ed8">📥 Importar Gastos Comunes desde Excel</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:8px">Compatible con tu planilla de Condominio las Araucarias. Los encabezados se detectan automáticamente.</p>
-      <div style="background:#fef9c3;border-radius:8px;padding:10px;font-size:12px;color:#713f12;margin-bottom:12px">
-        ⚠️ Al importar se <strong>reemplazarán</strong> los datos actuales de la planilla.
-      </div>
-      <input type="file" id="imp-gc-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
-      <div id="imp-gc-status" style="margin-bottom:8px;font-size:13px;min-height:20px"></div>
-      <div id="imp-gc-preview" style="max-height:260px;overflow-y:auto;margin-bottom:16px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="this.closest('div[style*=fixed]').remove()">Cancelar</button>
-        <button id="btn-imp-gc" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportGastos()">✅ Importar planilla</button>
-      </div>
-    </div>`;
-  document.body.appendChild(m);
-
-  document.getElementById('imp-gc-file').addEventListener('change', e => {
-    const file = e.target.files[0]; if (!file) return;
-    const status = document.getElementById('imp-gc-status');
-    const preview = document.getElementById('imp-gc-preview');
-    status.innerHTML = '⏳ Leyendo archivo...';
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try {
-        const data = new Uint8Array(ev.target.result);
-        const wb = XLSX.read(data, {type:'array'});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const allRows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-
-        // Buscar fila de encabezados: la que contenga "Unidad" o "unidad"
-        let headerIdx = -1;
-        for (let i = 0; i < allRows.length; i++) {
-          if (allRows[i].some(c => String(c).toLowerCase().trim() === 'unidad')) {
-            headerIdx = i;
-            break;
-          }
-        }
-        if (headerIdx === -1) { status.innerHTML = '❌ No se encontró fila de encabezados con "Unidad"'; return; }
-
-        const headers = allRows[headerIdx].map(h => String(h).trim());
-        const dataRows = allRows.slice(headerIdx + 1).filter(r => r[headers.indexOf('Unidad')] || r[1]);
-
-        // Mapear columnas flexiblemente por nombre
-        const getCol = (row, nombres) => {
-          for (const n of nombres) {
-            const idx = headers.findIndex(h => h.toLowerCase().includes(n.toLowerCase()));
-            if (idx >= 0 && row[idx] !== '' && row[idx] !== null && row[idx] !== undefined) return row[idx];
-          }
-          return 0;
-        };
-        const getColStr = (row, nombres) => {
-          for (const n of nombres) {
-            const idx = headers.findIndex(h => h.toLowerCase().includes(n.toLowerCase()));
-            if (idx >= 0 && row[idx] !== '') return String(row[idx]).trim();
-          }
-          return '';
-        };
-
-        window._importGCRows = dataRows.map(r => {
-          const unidad = String(getCol(r,['Unidad'])||'').trim().replace(/\.0$/,'');
-          if (!unidad || unidad === '0') return null;
-          return {
-            unidad,
-            residente: getColStr(r, ['Residente','Nombre','Propietario']),
-            saldoAnterior: Number(getCol(r,['Saldo a Favor','saldo a favor','Saldo Anterior']))||0,
-            prorrateo: Number(getCol(r,['Prorrateo']))||0,
-            gcEgresos: Number(getCol(r,['Gasto común - Egresos','Egresos','GC Egresos','gcEgresos']))||0,
-            cargos: Number(getCol(r,['Cargos impagos','Cargos','cargos']))||0,
-            totalMes: Number(getCol(r,['Total mes','totalMes','Total Mes']))||0,
-            capitalAtrasado: Number(getCol(r,['Capital Atrasado','capitalAtrasado']))||0,
-            intereses: Number(getCol(r,['Intereses y multas','Intereses','intereses']))||0,
-            abonos: Number(getCol(r,['Abonos']))||0,
-            totalCobrado: Number(getCol(r,['Total cobrado','totalCobrado']))||0,
-            saldoFavor: Number(getCol(r,['Saldo a favor','saldoFavor','Saldo Favor']))||0
-          };
-        }).filter(r => r && r.unidad);
-
-        if (!window._importGCRows.length) { status.innerHTML = '⚠️ No se encontraron filas válidas. Verifica que el encabezado tenga "Unidad".'; return; }
-
-        status.innerHTML = `✅ <strong>${window._importGCRows.length} unidades</strong> detectadas correctamente.`;
-        document.getElementById('btn-imp-gc').style.display = 'inline-block';
-
-        // Preview tabla
-        let html = `<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1d4ed8;color:white">
-          <th style="padding:5px">Unidad</th><th style="padding:5px">Residente</th><th style="padding:5px">Prorrateo</th>
-          <th style="padding:5px">Cargos</th><th style="padding:5px">Capital Atrasado</th><th style="padding:5px">Intereses</th><th style="padding:5px">Total Cobrado</th>
-        </tr></thead><tbody>`;
-        window._importGCRows.slice(0,6).forEach(r => {
-          html += `<tr style="border-bottom:1px solid #eee">
-            <td style="padding:4px 5px;text-align:center"><strong>${r.unidad}</strong></td>
-            <td style="padding:4px 5px">${r.residente}</td>
-            <td style="padding:4px 5px;text-align:right">$${r.prorrateo.toLocaleString('es-CL')}</td>
-            <td style="padding:4px 5px;text-align:right">$${r.cargos.toLocaleString('es-CL')}</td>
-            <td style="padding:4px 5px;text-align:right;color:#dc2626">$${r.capitalAtrasado.toLocaleString('es-CL')}</td>
-            <td style="padding:4px 5px;text-align:right;color:#f97316">$${r.intereses.toLocaleString('es-CL')}</td>
-            <td style="padding:4px 5px;text-align:right;font-weight:600">$${r.totalCobrado.toLocaleString('es-CL')}</td>
-          </tr>`;
-        });
-        if (window._importGCRows.length > 6) html += `<tr><td colspan="7" style="padding:6px;text-align:center;color:#666">...y ${window._importGCRows.length-6} unidades más</td></tr>`;
-        html += '</tbody></table>';
-        preview.innerHTML = html;
-      } catch(err) { status.innerHTML = '❌ Error leyendo archivo: ' + err.message; }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-async function ejecutarImportGastos() {
-  if (!window._importGCRows || !window._importGCRows.length) return;
-  const btn = document.getElementById('btn-imp-gc');
-  const status = document.getElementById('imp-gc-status');
-  btn.disabled = true;
-  status.innerHTML = '⏳ Importando...';
-
-  try {
-    // Borrar datos anteriores
-    const oldSnap = await db.collection('gastos_comunes_planilla').get();
-    for (const d of oldSnap.docs) await d.ref.delete();
-
-    // Importar nuevos
-    let ok = 0;
-    for (const r of window._importGCRows) {
-      await db.collection('gastos_comunes_planilla').add(r);
-      ok++;
-    }
-    status.innerHTML = `✅ ${ok} unidades importadas correctamente.`;
-    setTimeout(() => {
-      document.querySelector('div[style*="position:fixed"][style*="z-index:300"]')?.remove();
-      renderGastosTabla();
-    }, 1500);
-  } catch(e) {
-    status.innerHTML = '❌ Error: ' + e.message;
-    btn.disabled = false;
-  }
+  document.getElementById('lista-gastos').innerHTML = html;
 }
 
 function exportarGastosExcel() {
@@ -1372,8 +851,7 @@ function mostrarEgresos() {
       <div class="card"><div class="card-icon">💡</div><div class="card-valor" id="egresos-servicios">—</div><div class="card-label">Servicios básicos</div></div>
       <div class="card"><div class="card-icon">👷</div><div class="card-valor" id="egresos-rrhh">—</div><div class="card-label">RR.HH.</div></div>
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px">
-      <button class="btn btn-verde" style="background:#7b2d8b" onclick="abrirImportarExcelEgresos()">📥 Importar Excel</button>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
       <button class="btn btn-verde" onclick="abrirModalEgreso()">+ Registrar egreso</button>
     </div>
     <div class="tabla-wrap">
@@ -1432,24 +910,10 @@ function cargarEgresos() {
     document.getElementById('egresos-rrhh').textContent = '$'+rrhh.toLocaleString('es-CL');
 
     if (snap.empty) { document.getElementById('lista-egresos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay egresos registrados</div>'; return; }
-    let html = '<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Forma pago</th><th>Doc.</th><th>Acciones</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Forma pago</th><th>Doc.</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const e = d.data(); const id = d.id;
-      const datosStr = JSON.stringify({...e}).replace(/'/g,"&#39;");
-      html += `<tr>
-        <td>${e.fecha||'—'}</td>
-        <td><span class="badge badge-gris">${e.categoria||'—'}</span></td>
-        <td>${e.descripcion||'—'}</td>
-        <td>${e.proveedor||'—'}</td>
-        <td style="text-align:right">$${Number(e.monto||0).toLocaleString('es-CL')}</td>
-        <td>${e.forma||'—'}</td>
-        <td>${e.documento||'—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:3px" onclick='abrirEditarEgreso("${id}",${datosStr})'>✏️</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:white;margin-right:3px" onclick="eliminarEgreso('${id}')">🗑️</button>
-          <button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick='descargarComprobanteEgreso(${datosStr})'>📄</button>
-        </td>
-      </tr>`;
+      const e = d.data();
+      html += `<tr><td>${e.fecha||'—'}</td><td><span class="badge badge-gris">${e.categoria||'—'}</span></td><td>${e.descripcion||'—'}</td><td>${e.proveedor||'—'}</td><td>$${Number(e.monto||0).toLocaleString('es-CL')}</td><td>${e.forma||'—'}</td><td>${e.documento||'—'}</td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('lista-egresos').innerHTML = html;
@@ -1724,9 +1188,9 @@ function descargarWordCarta(){
   const a=document.createElement('a');a.href=url;a.download='Carta_Araucarias.doc';a.click();
 }
 
-function abrirModalEgreso() { document.getElementById('modal-egreso').style.display='flex'; document.getElementById('e-fecha').value=new Date().toISOString().split('T')[0]; }
+ document.getElementById('modal-egreso').style.display='flex'; }
 function cerrarModalEgreso() { document.getElementById('modal-egreso').style.display='none'; }
-async function guardarEgreso() {
+function guardarEgreso() {
   const datos = {
     fecha: document.getElementById('e-fecha').value,
     categoria: document.getElementById('e-categoria').value,
@@ -1735,116 +1199,9 @@ async function guardarEgreso() {
     monto: Number(document.getElementById('e-monto').value),
     forma: document.getElementById('e-forma').value,
     documento: document.getElementById('e-documento').value,
-    fechaRegistro: new Date().toISOString()
   };
   if (!datos.descripcion || !datos.monto) { alert('Ingresa al menos la descripción y el monto'); return; }
-  try {
-    const ref = await db.collection('egresos').add(datos);
-    // Auto-registrar en libro diario
-    await db.collection('libro_diario').add({
-      fecha: datos.fecha,
-      glosa: `Egreso: ${datos.descripcion} — ${datos.categoria||''}`,
-      cuentaDebe: datos.categoria||'Gastos generales',
-      montoDebe: datos.monto,
-      cuentaHaber: datos.forma==='Efectivo'?'Caja chica':'Banco',
-      montoHaber: datos.monto,
-      documento: datos.documento||'',
-      origen: 'egreso_automatico',
-      referenciaId: ref.id
-    });
-    cerrarModalEgreso();
-    cargarEgresos();
-    // Ofrecer descarga de comprobante
-    if (confirm('✅ Egreso registrado y asiento contable generado.\n\n¿Descargar comprobante en PDF?')) {
-      descargarComprobanteEgreso(datos);
-    }
-  } catch(e) { alert('Error: '+e.message); }
-}
-
-function descargarComprobanteEgreso(datos) {
-  const [y,m,d] = (datos.fecha||'').split('-');
-  const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const html = `<!DOCTYPE html><html><head><title>Comprobante Egreso</title>
-  <style>body{font-family:Arial,sans-serif;font-size:13px;padding:50px;max-width:700px;margin:0 auto;line-height:1.8}
-  table{width:100%;border-collapse:collapse}td{padding:10px;border:1px solid #ccc}
-  .titulo{font-weight:700;font-size:15px;text-align:center;letter-spacing:1px;margin-bottom:24px;text-decoration:underline}
-  @media print{body{padding:30px}}</style>
-  <script>window.onload=function(){window.print();}<\/script>
-  </head><body>
-  <div style="text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #0f4a2c">
-    <div style="font-size:15px;font-weight:700;color:#0f4a2c">CONDOMINIO LAS ARAUCARIAS</div>
-    <div style="font-size:11px;color:#555">Sargento Aldea 67, La Cruz, Quillota · RUT: 53.321.396-0</div>
-  </div>
-  <p style="text-align:right">La Cruz, ${parseInt(d||0)} de ${meses[parseInt(m||1)]} del ${y}.-</p>
-  <p class="titulo">COMPROBANTE DE EGRESO</p>
-  <table>
-    <tr style="background:#e8f5ee"><td><strong>Fecha</strong></td><td>${datos.fecha||'—'}</td></tr>
-    <tr><td><strong>Categoría</strong></td><td>${datos.categoria||'—'}</td></tr>
-    <tr style="background:#e8f5ee"><td><strong>Descripción</strong></td><td>${datos.descripcion||'—'}</td></tr>
-    <tr><td><strong>Proveedor</strong></td><td>${datos.proveedor||'—'}</td></tr>
-    <tr style="background:#e8f5ee"><td><strong>Forma de pago</strong></td><td>${datos.forma||'—'}</td></tr>
-    <tr><td><strong>N° Documento</strong></td><td>${datos.documento||'—'}</td></tr>
-    <tr style="background:#0f4a2c;color:white"><td><strong>MONTO TOTAL</strong></td><td><strong>$${Number(datos.monto||0).toLocaleString('es-CL')}</strong></td></tr>
-  </table>
-  <br>
-  <p>Asiento contable automático registrado:</p>
-  <table><tr style="background:#d6eaf8"><th>Cuenta</th><th>Debe</th><th>Haber</th></tr>
-    <tr><td>${datos.categoria||'Gastos generales'}</td><td style="text-align:right">$${Number(datos.monto||0).toLocaleString('es-CL')}</td><td></td></tr>
-    <tr><td>${datos.forma==='Efectivo'?'Caja chica':'Banco'}</td><td></td><td style="text-align:right">$${Number(datos.monto||0).toLocaleString('es-CL')}</td></tr>
-  </table>
-  <div style="margin-top:60px;display:flex;justify-content:space-between">
-    <div style="text-align:center"><p>_______________________</p><p style="font-size:12px">Administración</p></div>
-    <div style="text-align:center"><p>_______________________</p><p style="font-size:12px">Recibe conforme</p></div>
-  </div>
-  </body></html>`;
-  const v = window.open('','_blank');
-  v.document.write(html);
-  v.document.close();
-}
-
-function abrirEditarEgreso(id, datos) {
-  const existente = document.getElementById('modal-editar-egreso');
-  if(existente) existente.remove();
-  const modal = document.createElement('div');
-  modal.id = 'modal-editar-egreso';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:92vw">
-      <h3 style="margin-bottom:20px;color:var(--verde4)">✏️ Editar egreso</h3>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <input id="ee-fecha" type="date" value="${datos.fecha||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <select id="ee-categoria" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          ${['Mantención','Servicios básicos','RR.HH.','Administración','Seguros','Limpieza','Jardín','Otro'].map(c=>`<option ${c===datos.categoria?'selected':''}>${c}</option>`).join('')}
-        </select>
-        <input id="ee-descripcion" value="${datos.descripcion||''}" placeholder="Descripción" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <input id="ee-proveedor" value="${datos.proveedor||''}" placeholder="Proveedor" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <input id="ee-monto" type="number" value="${datos.monto||0}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        <select id="ee-forma" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          ${['Transferencia','Efectivo','Cheque','Débito'].map(f=>`<option ${f===datos.forma?'selected':''}>${f}</option>`).join('')}
-        </select>
-        <input id="ee-documento" value="${datos.documento||''}" placeholder="N° Documento" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-      </div>
-      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-editar-egreso').remove()">Cancelar</button>
-        <button class="btn btn-verde" onclick="guardarEdicionEgreso('${id}')">💾 Guardar</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-}
-
-function guardarEdicionEgreso(id) {
-  const datos = {
-    fecha: document.getElementById('ee-fecha').value,
-    categoria: document.getElementById('ee-categoria').value,
-    descripcion: document.getElementById('ee-descripcion').value,
-    proveedor: document.getElementById('ee-proveedor').value,
-    monto: Number(document.getElementById('ee-monto').value),
-    forma: document.getElementById('ee-forma').value,
-    documento: document.getElementById('ee-documento').value
-  };
-  db.collection('egresos').doc(id).update(datos)
-    .then(()=>{ document.getElementById('modal-editar-egreso').remove(); cargarEgresos(); })
-    .catch(e=>alert('Error: '+e.message));
+  db.collection('egresos').add(datos).then(() => { cerrarModalEgreso(); cargarEgresos(); }).catch(e => alert('Error: '+e.message));
 }
 
 function abrirModalGasto() { document.getElementById('modal-gasto').style.display = 'flex'; }
@@ -1923,6 +1280,10 @@ function editarAsiento(id, datos) {
   document.getElementById('a-monto-haber').value=datos.montoHaber||'';
   document.getElementById('a-documento').value=datos.documento||'';
   document.getElementById('modal-asiento').style.display='flex';
+}
+function eliminarAsiento(id) {
+  if(!confirm('¿Eliminar este asiento contable?')) return;
+  db.collection('libro_diario').doc(id).delete().then(()=>cargarAsientos()).catch(e=>alert('Error: '+e.message));
 }
 function guardarAsiento() {
   const datos = {
@@ -2611,10 +1972,8 @@ function descargarWordCert(){
 function mostrarAcceso() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
       <button class="btn btn-verde" onclick="abrirModalAcceso()">+ Registrar acceso</button>
-      <button class="btn btn-verde" style="background:#1d4ed8" onclick="importarExcelAcceso()">📥 Importar Excel</button>
-      <button class="btn btn-verde" style="background:#166534" onclick="exportarExcelAcceso()">📊 Exportar Excel</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Control de Acceso</h3></div>
@@ -2622,7 +1981,7 @@ function mostrarAcceso() {
     </div>
     <div id="modal-acceso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 id="modal-acceso-titulo" style="margin-bottom:20px;color:var(--verde4)">Registrar acceso</h3>
+        <h3 style="margin-bottom:20px;color:var(--verde4)">Registrar acceso</h3>
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="ac-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="ac-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
@@ -2635,155 +1994,35 @@ function mostrarAcceso() {
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="cerrarModalAcceso()">Cancelar</button>
-          <button class="btn btn-verde" id="btn-guardar-acceso" onclick="guardarAcceso()">Guardar</button>
+          <button class="btn btn-verde" onclick="guardarAcceso()">Guardar</button>
         </div>
       </div>
     </div>`;
-  cargarAcceso();
-}
-
-function cargarAcceso() {
   db.collection('control_acceso').orderBy('unidad').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-acceso').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros de acceso</div>'; return; }
-    let html='<table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th><th>Acciones</th></tr></thead><tbody>';
+    let html='<table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const a=d.data(); const id=d.id;
-      const ds=JSON.stringify(a).replace(/'/g,"&#39;");
-      html+=`<tr>
-        <td><strong>${a.unidad||'—'}</strong></td>
-        <td><span class="badge badge-gris">${a.tipo||'—'}</span></td>
-        <td>${a.nombre||'—'}</td>
-        <td>${a.telefono||'—'}</td>
-        <td>${a.posicion||'—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:3px" onclick='editarAcceso("${id}",${ds})'>✏️</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarAcceso('${id}','${(a.nombre||'').replace(/'/g,'')}')">🗑️</button>
-        </td>
-      </tr>`;
+      const a=d.data();
+      html+=`<tr><td>${a.unidad||'—'}</td><td><span class="badge badge-gris">${a.tipo||'—'}</span></td><td>${a.nombre||'—'}</td><td>${a.telefono||'—'}</td><td>${a.posicion||'—'}</td></tr>`;
     });
     html+='</tbody></table>';
     document.getElementById('lista-acceso').innerHTML=html;
   }).catch(()=>{ document.getElementById('lista-acceso').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros aún</div>'; });
 }
-
-let _editAccesoId = null;
-function abrirModalAcceso(){
-  _editAccesoId=null;
-  document.getElementById('modal-acceso-titulo').textContent='Registrar acceso';
-  document.getElementById('ac-unidad').value='';
-  document.getElementById('ac-tipo').value='Acceso 1';
-  document.getElementById('ac-nombre').value='';
-  document.getElementById('ac-telefono').value='';
-  document.getElementById('ac-posicion').value='';
-  document.getElementById('modal-acceso').style.display='flex';
-}
-function cerrarModalAcceso(){document.getElementById('modal-acceso').style.display='none'; _editAccesoId=null;}
-
-function editarAcceso(id, datos) {
-  _editAccesoId = id;
-  document.getElementById('modal-acceso-titulo').textContent='Editar acceso';
-  document.getElementById('ac-unidad').value=datos.unidad||'';
-  document.getElementById('ac-tipo').value=datos.tipo||'Acceso 1';
-  document.getElementById('ac-nombre').value=datos.nombre||'';
-  document.getElementById('ac-telefono').value=datos.telefono||'';
-  document.getElementById('ac-posicion').value=datos.posicion||'';
-  document.getElementById('modal-acceso').style.display='flex';
-}
-
+function abrirModalAcceso(){document.getElementById('modal-acceso').style.display='flex';}
+function cerrarModalAcceso(){document.getElementById('modal-acceso').style.display='none';}
 function guardarAcceso(){
   const datos={unidad:document.getElementById('ac-unidad').value,tipo:document.getElementById('ac-tipo').value,nombre:document.getElementById('ac-nombre').value,telefono:document.getElementById('ac-telefono').value,posicion:document.getElementById('ac-posicion').value};
   if(!datos.unidad||!datos.nombre){alert('Ingresa la unidad y el nombre');return;}
-  const op = _editAccesoId ? db.collection('control_acceso').doc(_editAccesoId).update(datos) : db.collection('control_acceso').add(datos);
-  op.then(()=>{cerrarModalAcceso();cargarAcceso();}).catch(e=>alert('Error: '+e.message));
-}
-
-function eliminarAcceso(id, nombre){
-  if(!confirm('¿Eliminar el registro de '+nombre+'?')) return;
-  db.collection('control_acceso').doc(id).delete().then(()=>cargarAcceso()).catch(e=>alert('Error: '+e.message));
-}
-
-function exportarExcelAcceso(){
-  db.collection('control_acceso').orderBy('unidad').get().then(snap=>{
-    let csv='Unidad,Acceso,Nombre,Teléfono,N° Posición\n';
-    snap.forEach(d=>{const a=d.data();csv+=`${a.unidad||''},${a.tipo||''},"${a.nombre||''}",${a.telefono||''},${a.posicion||''}\n`;});
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download='Control_Acceso.csv';a.click();
-  });
-}
-
-function importarExcelAcceso(){
-  const m=document.createElement('div');
-  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:500px;max-width:95vw">
-    <h3 style="margin-bottom:8px;color:#1d4ed8">📥 Importar Control de Acceso</h3>
-    <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas: <strong>unidad, tipo, nombre, telefono, posicion</strong>. Acepta .xlsx y .csv.</p>
-    <input type="file" id="imp-ac-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
-    <div id="imp-ac-status" style="margin-bottom:12px;font-size:13px"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-outline" onclick="this.closest('div[style]').remove()">Cancelar</button>
-      <button id="btn-imp-ac" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportAcceso()">✅ Importar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-  document.getElementById('imp-ac-file').addEventListener('change', e=>{
-    const file=e.target.files[0]; if(!file) return;
-    const status=document.getElementById('imp-ac-status');
-    status.innerHTML='⏳ Leyendo...';
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      try {
-        let rows=[];
-        if(file.name.endsWith('.csv')){
-          const lines=ev.target.result.split('\n').filter(l=>l.trim());
-          const headers=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,''));
-          for(let i=1;i<lines.length;i++){
-            const vals=lines[i].split(/[,;]/);
-            const obj={};
-            headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').trim().replace(/^"|"$/g,''));
-            rows.push(obj);
-          }
-        } else {
-          const data=new Uint8Array(ev.target.result);
-          const wb=XLSX.read(data,{type:'array'});
-          rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-          rows=rows.map(r=>{const n={};Object.keys(r).forEach(k=>n[k.trim().toLowerCase().replace(/[^a-záéíóúñ]/gi,'')]=r[k]);return n;});
-        }
-        window._importAccesoRows=rows.filter(r=>r.unidad||r.nombre).map(r=>({
-          unidad:String(r.unidad||'').trim(),
-          tipo:String(r.tipo||'Acceso 1').trim(),
-          nombre:String(r.nombre||'').trim(),
-          telefono:String(r.telefono||'').trim(),
-          posicion:String(r.posicion||'').trim()
-        })).filter(r=>r.unidad&&r.nombre);
-        status.innerHTML=`✅ ${window._importAccesoRows.length} registros listos.`;
-        document.getElementById('btn-imp-ac').style.display='inline-block';
-      } catch(err){status.innerHTML='❌ Error: '+err.message;}
-    };
-    if(file.name.endsWith('.csv')) reader.readAsText(file,'UTF-8');
-    else reader.readAsArrayBuffer(file);
-  });
-}
-
-async function ejecutarImportAcceso(){
-  if(!window._importAccesoRows||!window._importAccesoRows.length) return;
-  let ok=0;
-  for(const r of window._importAccesoRows){
-    try{await db.collection('control_acceso').add(r);ok++;}catch(e){}
-  }
-  alert(`✅ ${ok} registros importados.`);
-  document.querySelector('div[style*="position:fixed"][style*="z-index:300"]')?.remove();
-  cargarAcceso();
+  db.collection('control_acceso').add(datos).then(()=>{cerrarModalAcceso();mostrarAcceso();}).catch(e=>alert('Error: '+e.message));
 }
 
 // ===================== CITOFONÍA =====================
 function mostrarCitofonia() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
       <button class="btn btn-verde" onclick="abrirModalCitofono()">+ Registrar citófono</button>
-      <button class="btn btn-verde" style="background:#1d4ed8" onclick="importarExcelCitofono()">📥 Importar Excel</button>
-      <button class="btn btn-verde" style="background:#166534" onclick="exportarExcelCitofono()">📊 Exportar Excel</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Registro de Citofonía</h3></div>
@@ -2791,7 +2030,7 @@ function mostrarCitofonia() {
     </div>
     <div id="modal-citofono" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 id="modal-cito-titulo" style="margin-bottom:20px;color:var(--verde4)">Registrar citófono</h3>
+        <h3 style="margin-bottom:20px;color:var(--verde4)">Registrar citófono</h3>
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="ci-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="ci-citofono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
@@ -2808,137 +2047,23 @@ function mostrarCitofonia() {
         </div>
       </div>
     </div>`;
-  cargarCitofonia();
-}
-
-function cargarCitofonia() {
   db.collection('citofonia').orderBy('unidad').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-citofonia').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros de citofonía</div>'; return; }
-    let html='<table><thead><tr><th>Unidad</th><th>Citófono</th><th>Nombre</th><th>Teléfono</th><th>Acciones</th></tr></thead><tbody>';
+    let html='<table><thead><tr><th>Unidad</th><th>Citófono</th><th>Nombre</th><th>Teléfono</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const ci=d.data(); const id=d.id;
-      const ds=JSON.stringify(ci).replace(/'/g,"&#39;");
-      html+=`<tr>
-        <td><strong>${ci.unidad||'—'}</strong></td>
-        <td><span class="badge badge-gris">${ci.citofono||'—'}</span></td>
-        <td>${ci.nombre||'—'}</td>
-        <td>${ci.telefono||'—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:3px" onclick='editarCitofono("${id}",${ds})'>✏️</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarCitofono('${id}','${(ci.nombre||'').replace(/'/g,'')}')">🗑️</button>
-        </td>
-      </tr>`;
+      const ci=d.data();
+      html+=`<tr><td>${ci.unidad||'—'}</td><td><span class="badge badge-gris">${ci.citofono||'—'}</span></td><td>${ci.nombre||'—'}</td><td>${ci.telefono||'—'}</td></tr>`;
     });
     html+='</tbody></table>';
     document.getElementById('lista-citofonia').innerHTML=html;
   }).catch(()=>{ document.getElementById('lista-citofonia').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros aún</div>'; });
 }
-
-let _editCitofonoId = null;
-function abrirModalCitofono(){
-  _editCitofonoId=null;
-  document.getElementById('modal-cito-titulo').textContent='Registrar citófono';
-  document.getElementById('ci-unidad').value='';
-  document.getElementById('ci-citofono').value='Citófono 1';
-  document.getElementById('ci-nombre').value='';
-  document.getElementById('ci-telefono').value='';
-  document.getElementById('modal-citofono').style.display='flex';
-}
-function cerrarModalCitofono(){document.getElementById('modal-citofono').style.display='none'; _editCitofonoId=null;}
-
-function editarCitofono(id, datos) {
-  _editCitofonoId=id;
-  document.getElementById('modal-cito-titulo').textContent='Editar citófono';
-  document.getElementById('ci-unidad').value=datos.unidad||'';
-  document.getElementById('ci-citofono').value=datos.citofono||'Citófono 1';
-  document.getElementById('ci-nombre').value=datos.nombre||'';
-  document.getElementById('ci-telefono').value=datos.telefono||'';
-  document.getElementById('modal-citofono').style.display='flex';
-}
-
+function abrirModalCitofono(){document.getElementById('modal-citofono').style.display='flex';}
+function cerrarModalCitofono(){document.getElementById('modal-citofono').style.display='none';}
 function guardarCitofono(){
   const datos={unidad:document.getElementById('ci-unidad').value,citofono:document.getElementById('ci-citofono').value,nombre:document.getElementById('ci-nombre').value,telefono:document.getElementById('ci-telefono').value};
   if(!datos.unidad||!datos.nombre){alert('Ingresa la unidad y el nombre');return;}
-  const op = _editCitofonoId ? db.collection('citofonia').doc(_editCitofonoId).update(datos) : db.collection('citofonia').add(datos);
-  op.then(()=>{cerrarModalCitofono();cargarCitofonia();}).catch(e=>alert('Error: '+e.message));
-}
-
-function eliminarCitofono(id, nombre){
-  if(!confirm('¿Eliminar el registro de '+nombre+'?')) return;
-  db.collection('citofonia').doc(id).delete().then(()=>cargarCitofonia()).catch(e=>alert('Error: '+e.message));
-}
-
-function exportarExcelCitofono(){
-  db.collection('citofonia').orderBy('unidad').get().then(snap=>{
-    let csv='Unidad,Citófono,Nombre,Teléfono\n';
-    snap.forEach(d=>{const ci=d.data();csv+=`${ci.unidad||''},${ci.citofono||''},"${ci.nombre||''}",${ci.telefono||''}\n`;});
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download='Citofonia.csv';a.click();
-  });
-}
-
-function importarExcelCitofono(){
-  const m=document.createElement('div');
-  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:500px;max-width:95vw">
-    <h3 style="margin-bottom:8px;color:#1d4ed8">📥 Importar Citofonía</h3>
-    <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas: <strong>unidad, citofono, nombre, telefono</strong>. Acepta .xlsx y .csv.</p>
-    <input type="file" id="imp-ci-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
-    <div id="imp-ci-status" style="margin-bottom:12px;font-size:13px"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-outline" onclick="this.closest('div[style]').remove()">Cancelar</button>
-      <button id="btn-imp-ci" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportCitofono()">✅ Importar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-  document.getElementById('imp-ci-file').addEventListener('change', e=>{
-    const file=e.target.files[0]; if(!file) return;
-    const status=document.getElementById('imp-ci-status');
-    status.innerHTML='⏳ Leyendo...';
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      try {
-        let rows=[];
-        if(file.name.endsWith('.csv')){
-          const lines=ev.target.result.split('\n').filter(l=>l.trim());
-          const headers=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,''));
-          for(let i=1;i<lines.length;i++){
-            const vals=lines[i].split(/[,;]/);
-            const obj={};
-            headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').trim().replace(/^"|"$/g,''));
-            rows.push(obj);
-          }
-        } else {
-          const data=new Uint8Array(ev.target.result);
-          const wb=XLSX.read(data,{type:'array'});
-          rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-          rows=rows.map(r=>{const n={};Object.keys(r).forEach(k=>n[k.trim().toLowerCase().replace(/[^a-záéíóúñ]/gi,'')]=r[k]);return n;});
-        }
-        window._importCitofonoRows=rows.filter(r=>r.unidad||r.nombre).map(r=>({
-          unidad:String(r.unidad||'').trim(),
-          citofono:String(r.citofono||'Citófono 1').trim(),
-          nombre:String(r.nombre||'').trim(),
-          telefono:String(r.telefono||'').trim()
-        })).filter(r=>r.unidad&&r.nombre);
-        status.innerHTML=`✅ ${window._importCitofonoRows.length} registros listos.`;
-        document.getElementById('btn-imp-ci').style.display='inline-block';
-      } catch(err){status.innerHTML='❌ Error: '+err.message;}
-    };
-    if(file.name.endsWith('.csv')) reader.readAsText(file,'UTF-8');
-    else reader.readAsArrayBuffer(file);
-  });
-}
-
-async function ejecutarImportCitofono(){
-  if(!window._importCitofonoRows||!window._importCitofonoRows.length) return;
-  let ok=0;
-  for(const r of window._importCitofonoRows){
-    try{await db.collection('citofonia').add(r);ok++;}catch(e){}
-  }
-  alert(`✅ ${ok} registros importados.`);
-  document.querySelector('div[style*="position:fixed"][style*="z-index:300"]')?.remove();
-  cargarCitofonia();
+  db.collection('citofonia').add(datos).then(()=>{cerrarModalCitofono();mostrarCitofonia();}).catch(e=>alert('Error: '+e.message));
 }
 
 // ===================== ENCOMIENDAS =====================
@@ -3040,6 +2165,54 @@ function guardarVisita(){
 }
 
 // ===================== TRABAJADORES =====================
+function mostrarTrabajadores() {
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-verde" onclick="abrirModalTrabajador()">+ Agregar trabajador</button>
+    </div>
+    <div class="tabla-wrap">
+      <div class="tabla-header"><h3>Trabajadores</h3></div>
+      <div id="lista-trabajadores"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
+    </div>
+    <div id="modal-trabajador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
+      <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
+        <h3 style="margin-bottom:20px;color:var(--verde4)">Agregar trabajador</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <input id="tr-nombre" placeholder="Nombre completo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-rut" placeholder="RUT" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <select id="tr-cargo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option>Conserje</option><option>Portero</option><option>Jardinero</option><option>Aseo</option><option>Administrador</option><option>Otro</option>
+          </select>
+          <input id="tr-telefono" placeholder="Teléfono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-correo" placeholder="Correo electrónico" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-ingreso" type="date" placeholder="Fecha de ingreso" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-sueldo" placeholder="Sueldo bruto ($)" type="number" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="cerrarModalTrabajador()">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarTrabajador()">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+  db.collection('trabajadores').get().then(snap => {
+    if (snap.empty) { document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores registrados</div>'; return; }
+    let html='<table><thead><tr><th>Nombre</th><th>RUT</th><th>Cargo</th><th>Teléfono</th><th>Correo</th><th>Ingreso</th><th>Sueldo bruto</th></tr></thead><tbody>';
+    snap.forEach(d => {
+      const tr=d.data();
+      html+=`<tr><td>${tr.nombre||'—'}</td><td>${tr.rut||'—'}</td><td><span class="badge badge-gris">${tr.cargo||'—'}</span></td><td>${tr.telefono||'—'}</td><td>${tr.correo||'—'}</td><td>${tr.ingreso||'—'}</td><td>$${Number(tr.sueldo||0).toLocaleString('es-CL')}</td></tr>`;
+    });
+    html+='</tbody></table>';
+    document.getElementById('lista-trabajadores').innerHTML=html;
+  }).catch(()=>{ document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores aún</div>'; });
+}
+function abrirModalTrabajador(){document.getElementById('modal-trabajador').style.display='flex';}
+function cerrarModalTrabajador(){document.getElementById('modal-trabajador').style.display='none';}
+function guardarTrabajador(){
+  const datos={nombre:document.getElementById('tr-nombre').value,rut:document.getElementById('tr-rut').value,cargo:document.getElementById('tr-cargo').value,telefono:document.getElementById('tr-telefono').value,correo:document.getElementById('tr-correo').value,ingreso:document.getElementById('tr-ingreso').value,sueldo:Number(document.getElementById('tr-sueldo').value)||0};
+  if(!datos.nombre){alert('Ingresa el nombre');return;}
+  db.collection('trabajadores').add(datos).then(()=>{cerrarModalTrabajador();mostrarTrabajadores();}).catch(e=>alert('Error: '+e.message));
+}
 
 // ===================== PUBLICACIONES =====================
 function mostrarPublicaciones() {
@@ -3462,8 +2635,8 @@ function eliminarEgreso(id){
 
 // ===== LIBRO DIARIO: eliminar =====
 function eliminarAsiento(id){
-  if(!confirm('¿Eliminar este asiento contable? Esta acción no se puede deshacer.')) return;
-  db.collection('libro_diario').doc(id).delete().then(()=>cargarAsientos()).catch(e=>alert('Error al eliminar: '+e.message));
+  if(!confirm('¿Eliminar este asiento?')) return;
+  db.collection('libroDiario').doc(id).delete().then(()=>cargarLibroDiario()).catch(e=>alert('Error: '+e.message));
 }
 
 // ===== PUBLICACIONES: eliminar =====
@@ -4172,924 +3345,6 @@ function cerrarModalEnviarCorreo() {
   if (m) m.style.display = 'none';
   _pubCorreoActual = null;
 }
-
-// ===================== IMPORTAR EXCEL — RECAUDACIÓN =====================
-function abrirImportarExcelRecaudacion() {
-  const modal = document.createElement('div');
-  modal.id = 'modal-import-recaud';
-  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
-      <h3 style="margin-bottom:6px;color:var(--verde4)">📥 Importar Pagos desde Excel</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:16px">El archivo debe tener columnas: <strong>unidad, concepto, monto, fecha, forma</strong> (en cualquier orden). Acepta .xlsx y .csv.</p>
-      <input type="file" id="imp-recaud-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
-      <div id="imp-recaud-status" style="margin-bottom:12px;font-size:13px;min-height:20px"></div>
-      <div id="imp-recaud-preview" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-import-recaud').remove()">Cancelar</button>
-        <button id="btn-imp-recaud" class="btn btn-verde" style="display:none" onclick="ejecutarImportRecaudacion()">✅ Importar registros</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  document.getElementById('imp-recaud-file').addEventListener('change', procesarArchivoRecaudacion);
-}
-
-let _datosImportRecaud = [];
-function procesarArchivoRecaudacion(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const status = document.getElementById('imp-recaud-status');
-  const preview = document.getElementById('imp-recaud-preview');
-  _datosImportRecaud = [];
-  status.innerHTML = '⏳ Leyendo archivo...';
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      let rows = [];
-      if (file.name.endsWith('.csv')) {
-        const text = ev.target.result;
-        const lines = text.split('\n').filter(l => l.trim());
-        const headers = lines[0].split(/[,;]/).map(h => h.trim().toLowerCase().replace(/[^a-záéíóúñ]/gi,''));
-        for (let i=1;i<lines.length;i++) {
-          const vals = lines[i].split(/[,;]/);
-          const obj = {};
-          headers.forEach((h,idx) => obj[h] = (vals[idx]||'').trim().replace(/^"|"$/g,''));
-          rows.push(obj);
-        }
-      } else {
-        const data = new Uint8Array(ev.target.result);
-        const wb = XLSX.read(data, {type:'array',cellDates:true});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        // Buscar la fila de encabezados (puede estar en fila 1 o más abajo)
-        const rawRows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
-        let headerIdx = 0;
-        for (let i=0; i<Math.min(10, rawRows.length); i++) {
-          const rowLow = rawRows[i].map(c => String(c||'').toLowerCase());
-          if (rowLow.some(c => c.includes('unidad') || c.includes('residente'))) { headerIdx = i; break; }
-        }
-        const headers = rawRows[headerIdx].map(h => String(h||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,''));
-        rows = [];
-        for (let i=headerIdx+1; i<rawRows.length; i++) {
-          const vals = rawRows[i];
-          if (!vals || vals.every(v => v==='' || v===null || v===undefined)) continue;
-          const obj = {};
-          headers.forEach((h,idx) => obj[h] = vals[idx]!==undefined ? vals[idx] : '');
-          rows.push(obj);
-        }
-      }
-      // Normalizar campos — compatible con columnas de CF y Excel propio
-      const CAMPOS = {
-        unidad:['unidad','unit','dpto','depto','n'],
-        concepto:['concepto','descripcion','detalle','glosa','cobro'],
-        // monto: acepta "pagado", "cobro", "monto", "importe", "valor"
-        monto:['pagado','monto','importe','valor','amount','abono'],
-        fecha:['fecha','date','fec'],
-        forma:['forma','formapago','tipopago','medio','pago'],
-        residente:['residente','nombre','propietario']
-      };
-      function buscarCampo(row, posibles) {
-        for (const p of posibles) {
-          const key = Object.keys(row).find(k => k === p || k.startsWith(p));
-          if (key !== undefined && row[key] !== '' && row[key] !== null && row[key] !== undefined) return row[key];
-        }
-        return '';
-      }
-      const mesActualStr = new Date().toISOString().split('T')[0].slice(0,7);
-      _datosImportRecaud = rows.map(r => {
-        const unidad = String(buscarCampo(r,CAMPOS.unidad)||'').trim().replace(/^\.+/,'');
-        const montoRaw = buscarCampo(r,CAMPOS.monto);
-        const monto = Number(String(montoRaw||0).replace(/[^0-9.-]/g,''));
-        const residente = String(buscarCampo(r,CAMPOS.residente)||'').trim();
-        const concepto = String(buscarCampo(r,CAMPOS.concepto)||residente||'Gasto común importado').trim();
-        return {
-          unidad,
-          concepto: concepto || 'Gasto común importado',
-          monto,
-          fecha: normalizarFecha(buscarCampo(r,CAMPOS.fecha)) || (mesActualStr+'-01'),
-          forma: String(buscarCampo(r,CAMPOS.forma)||'Transferencia').trim()||'Transferencia',
-          tipo: 'Pago'
-        };
-      }).filter(r => r.unidad && !isNaN(Number(r.unidad)) && r.monto > 0);
-      if (_datosImportRecaud.length === 0) { status.innerHTML = '⚠️ No se encontraron registros válidos. Verifica que el archivo tenga columnas: unidad, monto.'; return; }
-      status.innerHTML = `✅ <strong>${_datosImportRecaud.length} registros</strong> listos para importar.`;
-      document.getElementById('btn-imp-recaud').style.display = 'inline-block';
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#1a7a4a;color:white"><th style="padding:6px">Unidad</th><th style="padding:6px">Concepto</th><th style="padding:6px">Monto</th><th style="padding:6px">Fecha</th><th style="padding:6px">Forma</th></tr></thead><tbody>';
-      _datosImportRecaud.slice(0,10).forEach(r => {
-        html += `<tr style="border-bottom:1px solid #eee"><td style="padding:5px;text-align:center">${r.unidad}</td><td style="padding:5px">${r.concepto}</td><td style="padding:5px;text-align:right">$${r.monto.toLocaleString('es-CL')}</td><td style="padding:5px;text-align:center">${r.fecha}</td><td style="padding:5px">${r.forma}</td></tr>`;
-      });
-      if (_datosImportRecaud.length > 10) html += `<tr><td colspan="5" style="padding:6px;text-align:center;color:#666">... y ${_datosImportRecaud.length-10} registros más</td></tr>`;
-      html += '</tbody></table>';
-      preview.innerHTML = html;
-    } catch(err) { status.innerHTML = '❌ Error al leer el archivo: ' + err.message; }
-  };
-  if (file.name.endsWith('.csv')) reader.readAsText(file, 'UTF-8');
-  else reader.readAsArrayBuffer(file);
-}
-
-async function ejecutarImportRecaudacion() {
-  if (!_datosImportRecaud.length) return;
-  const btn = document.getElementById('btn-imp-recaud');
-  const status = document.getElementById('imp-recaud-status');
-  btn.disabled = true; status.innerHTML = '⏳ Importando...';
-  let ok=0, err=0;
-  for (const r of _datosImportRecaud) {
-    try { await db.collection('pagos').add(r); ok++; }
-    catch(e) { err++; }
-  }
-  btn.disabled = false;
-  status.innerHTML = `✅ Importación completada: <strong>${ok} registros</strong>${err>0?`, ${err} errores`:''}.`;
-  _datosImportRecaud = [];
-  setTimeout(() => { const m=document.getElementById('modal-import-recaud'); if(m) m.remove(); cargarPagos(); }, 2000);
-}
-
-// ===================== IMPORTAR EXCEL — EGRESOS =====================
-function abrirImportarExcelEgresos() {
-  const modal = document.createElement('div');
-  modal.id = 'modal-import-egr';
-  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
-      <h3 style="margin-bottom:6px;color:#7b2d8b">📥 Importar Egresos desde Excel</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas requeridas: <strong>fecha, categoria, descripcion, monto</strong>. Opcionales: proveedor, forma, documento. Acepta .xlsx y .csv.</p>
-      <input type="file" id="imp-egr-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
-      <div id="imp-egr-status" style="margin-bottom:12px;font-size:13px;min-height:20px"></div>
-      <div id="imp-egr-preview" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-import-egr').remove()">Cancelar</button>
-        <button id="btn-imp-egr" class="btn btn-verde" style="display:none;background:#7b2d8b" onclick="ejecutarImportEgresos()">✅ Importar registros</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  document.getElementById('imp-egr-file').addEventListener('change', procesarArchivoEgresos);
-}
-
-let _datosImportEgr = [];
-function procesarArchivoEgresos(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const status = document.getElementById('imp-egr-status');
-  const preview = document.getElementById('imp-egr-preview');
-  _datosImportEgr = [];
-  status.innerHTML = '⏳ Leyendo archivo...';
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      let rows = [];
-      if (file.name.endsWith('.csv')) {
-        const text = ev.target.result;
-        const lines = text.split('\n').filter(l => l.trim());
-        const headers = lines[0].split(/[,;]/).map(h => h.trim().toLowerCase().replace(/[^a-záéíóúñ]/gi,''));
-        for (let i=1;i<lines.length;i++) {
-          const vals = lines[i].split(/[,;]/);
-          const obj = {};
-          headers.forEach((h,idx) => obj[h] = (vals[idx]||'').trim().replace(/^"|"$/g,''));
-          rows.push(obj);
-        }
-      } else {
-        const data = new Uint8Array(ev.target.result);
-        const wb = XLSX.read(data, {type:'array',cellDates:true});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-        rows = rows.map(r => {
-          const n = {};
-          Object.keys(r).forEach(k => n[k.trim().toLowerCase().replace(/\s+/g,'').replace(/[^a-záéíóúñ]/gi,'')] = r[k]);
-          return n;
-        });
-      }
-      const CAMPOS = {fecha:['fecha','date','fec'],categoria:['categoria','categora','tipo','rubro'],descripcion:['descripcion','descripcin','detalle','concepto','glosa'],monto:['monto','importe','valor','amount'],proveedor:['proveedor','empresa','razonsocial'],forma:['forma','formapago','medio','pago'],documento:['documento','factura','boleta','ndoc','numero']};
-      function buscarCampo(row, posibles) { for (const p of posibles) { if (row[p] !== undefined && row[p] !== '') return row[p]; } return ''; }
-      _datosImportEgr = rows.map(r => ({
-        fecha: normalizarFecha(buscarCampo(r,CAMPOS.fecha)),
-        categoria: String(buscarCampo(r,CAMPOS.categoria)||'Otro').trim()||'Otro',
-        descripcion: String(buscarCampo(r,CAMPOS.descripcion)||'Egreso importado').trim(),
-        monto: Number(String(buscarCampo(r,CAMPOS.monto)||0).replace(/[^0-9.-]/g,'')),
-        proveedor: String(buscarCampo(r,CAMPOS.proveedor)||'—').trim(),
-        forma: String(buscarCampo(r,CAMPOS.forma)||'Transferencia').trim()||'Transferencia',
-        documento: String(buscarCampo(r,CAMPOS.documento)||'').trim()
-      })).filter(r => r.monto > 0);
-      if (_datosImportEgr.length === 0) { status.innerHTML = '⚠️ No se encontraron registros válidos. Verifica que el archivo tenga columna monto con valores mayores a 0.'; return; }
-      status.innerHTML = `✅ <strong>${_datosImportEgr.length} registros</strong> listos para importar.`;
-      document.getElementById('btn-imp-egr').style.display = 'inline-block';
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#7b2d8b;color:white"><th style="padding:6px">Fecha</th><th style="padding:6px">Categoría</th><th style="padding:6px">Descripción</th><th style="padding:6px">Monto</th><th style="padding:6px">Proveedor</th></tr></thead><tbody>';
-      _datosImportEgr.slice(0,10).forEach(r => {
-        html += `<tr style="border-bottom:1px solid #eee"><td style="padding:5px;text-align:center">${r.fecha}</td><td style="padding:5px">${r.categoria}</td><td style="padding:5px">${r.descripcion}</td><td style="padding:5px;text-align:right">$${r.monto.toLocaleString('es-CL')}</td><td style="padding:5px">${r.proveedor}</td></tr>`;
-      });
-      if (_datosImportEgr.length > 10) html += `<tr><td colspan="5" style="padding:6px;text-align:center;color:#666">... y ${_datosImportEgr.length-10} registros más</td></tr>`;
-      html += '</tbody></table>';
-      preview.innerHTML = html;
-    } catch(err) { status.innerHTML = '❌ Error al leer el archivo: ' + err.message; }
-  };
-  if (file.name.endsWith('.csv')) reader.readAsText(file, 'UTF-8');
-  else reader.readAsArrayBuffer(file);
-}
-
-async function ejecutarImportEgresos() {
-  if (!_datosImportEgr.length) return;
-  const btn = document.getElementById('btn-imp-egr');
-  const status = document.getElementById('imp-egr-status');
-  btn.disabled = true; status.innerHTML = '⏳ Importando...';
-  let ok=0, err=0;
-  for (const r of _datosImportEgr) {
-    try { await db.collection('egresos').add(r); ok++; }
-    catch(e) { err++; }
-  }
-  btn.disabled = false;
-  status.innerHTML = `✅ Importación completada: <strong>${ok} registros</strong>${err>0?`, ${err} errores`:''}.`;
-  _datosImportEgr = [];
-  setTimeout(() => { const m=document.getElementById('modal-import-egr'); if(m) m.remove(); cargarEgresos(); }, 2000);
-}
-
-// Normalizar fecha desde varios formatos a YYYY-MM-DD
-function normalizarFecha(val) {
-  if (!val) return new Date().toISOString().split('T')[0];
-  if (val instanceof Date) return val.toISOString().split('T')[0];
-  const s = String(val).trim();
-  // DD/MM/YYYY o DD-MM-YYYY
-  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(s)) {
-    const [d,m,y] = s.split(/[\/\-]/);
-    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-  }
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  // Excel serial number
-  if (/^\d{5}$/.test(s)) {
-    const d = new Date((Number(s)-25569)*86400*1000);
-    return d.toISOString().split('T')[0];
-  }
-  return s || new Date().toISOString().split('T')[0];
-}
-
-// ===================== SISTEMA CONTABLE — SALDO Y ACUMULADO =====================
-// Saldo inicial en Firestore: doc 'sistema_contable/config' => {saldoInicialBanco, saldoInicialCaja, fechaInicio}
-
-async function obtenerSaldoSistema() {
-  const cfg = await db.collection('sistema_contable').doc('config').get();
-  const data = cfg.exists ? cfg.data() : {};
-  const saldoInicialBanco = Number(data.saldoInicialBanco||0);
-  const saldoInicialCaja = Number(data.saldoInicialCaja||0);
-  // Sumar todos los pagos (ingresos) y egresos
-  const [pagosSnap, egresosSnap] = await Promise.all([
-    db.collection('pagos').get(),
-    db.collection('egresos').get()
-  ]);
-  let totalIngresos = 0, totalEgresos = 0;
-  pagosSnap.forEach(d => { if (d.data().tipo !== 'Ajuste') totalIngresos += Number(d.data().monto||0); });
-  egresosSnap.forEach(d => { totalEgresos += Number(d.data().monto||0); });
-  return {
-    saldoInicialBanco, saldoInicialCaja,
-    totalIngresos, totalEgresos,
-    saldoBanco: saldoInicialBanco + totalIngresos - totalEgresos,
-    saldoCaja: saldoInicialCaja,
-    fechaInicio: data.fechaInicio || '2026-01-01'
-  };
-}
-
-// ===================== BALANCE MENSUAL =====================
-function mostrarBalance() {
-  const c = document.getElementById('content');
-  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const anioActual = new Date().getFullYear();
-  c.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
-      <select id="bal-anio" onchange="cargarBalance()" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        ${[anioActual-2,anioActual-1,anioActual,anioActual+1].map(y=>`<option value="${y}" ${y===anioActual?'selected':''}>${y}</option>`).join('')}
-      </select>
-      <button class="btn btn-verde" onclick="exportarBalanceExcel()">📊 Exportar Excel</button>
-      <button class="btn btn-verde" style="background:#1d4ed8" onclick="abrirImportarBalanceExcel()">📥 Importar meses históricos</button>
-      <button class="btn btn-verde" style="background:#7b2d8b" onclick="abrirRegistrarSaldoMes()">💾 Registrar saldo del mes</button>
-    </div>
-    <div class="cards-grid" style="margin-bottom:20px">
-      <div class="card"><div class="card-icon">💰</div><div class="card-valor" id="bal-total-ing">—</div><div class="card-label">Total ingresos año</div></div>
-      <div class="card"><div class="card-icon">📤</div><div class="card-valor" id="bal-total-egr">—</div><div class="card-label">Total egresos año</div></div>
-      <div class="card" id="bal-card-result"><div class="card-icon">📈</div><div class="card-valor" id="bal-resultado">—</div><div class="card-label">Resultado neto año</div></div>
-    </div>
-    <div class="tabla-wrap" style="margin-bottom:20px">
-      <div class="tabla-header" style="display:flex;justify-content:space-between;align-items:center"><h3>Saldos históricos registrados</h3></div>
-      <div id="bal-historicos">Cargando...</div>
-    </div>
-    <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Resumen mensual calculado</h3></div>
-      <div id="bal-tabla">Cargando...</div>
-    </div>`;
-  cargarBalance();
-  cargarSaldosHistoricos();
-}
-
-function abrirRegistrarSaldoMes() {
-  const m = document.createElement('div');
-  m.id = 'modal-saldo-mes';
-  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const anio = new Date().getFullYear();
-  m.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:460px;max-width:95vw">
-      <h3 style="margin-bottom:20px;color:#7b2d8b">💾 Registrar saldo del mes</h3>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div>
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Mes</label>
-            <select id="sm-mes" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-              ${meses.map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Año</label>
-            <select id="sm-anio" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-              ${[anio-2,anio-1,anio,anio+1].map(y=>`<option value="${y}" ${y===anio?'selected':''}>${y}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Ingresos del mes ($)</label>
-          <input id="sm-ingresos" type="number" placeholder="0" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Egresos del mes ($)</label>
-          <input id="sm-egresos" type="number" placeholder="0" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Observación (opcional)</label>
-          <input id="sm-obs" placeholder="Ej: Datos de planilla anterior" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-saldo-mes').remove()">Cancelar</button>
-        <button class="btn btn-verde" style="background:#7b2d8b" onclick="guardarSaldoMes()">💾 Guardar</button>
-      </div>
-    </div>`;
-  document.body.appendChild(m);
-  // Seleccionar mes actual
-  const mesActual = new Date().getMonth();
-  document.getElementById('sm-mes').value = mesActual + 1;
-}
-
-async function guardarSaldoMes() {
-  const mes = parseInt(document.getElementById('sm-mes').value);
-  const anio = parseInt(document.getElementById('sm-anio').value);
-  const ingresos = Number(document.getElementById('sm-ingresos').value)||0;
-  const egresos = Number(document.getElementById('sm-egresos').value)||0;
-  const obs = document.getElementById('sm-obs').value;
-  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  try {
-    await db.collection('balance_historico').doc(`${anio}-${String(mes).padStart(2,'0')}`).set({
-      mes, anio, ingresos, egresos, observacion: obs,
-      fechaRegistro: new Date().toISOString(), manual: true
-    });
-    document.getElementById('modal-saldo-mes').remove();
-    alert(`✅ Saldo de ${meses[mes]} ${anio} registrado correctamente.`);
-    cargarSaldosHistoricos();
-    cargarBalance();
-  } catch(e) { alert('Error: '+e.message); }
-}
-
-async function cargarSaldosHistoricos() {
-  const div = document.getElementById('bal-historicos');
-  if (!div) return;
-  try {
-    const snap = await db.collection('balance_historico').orderBy('anio','desc').get();
-    if (snap.empty) { div.innerHTML = '<div style="padding:16px;text-align:center;color:#999;font-size:13px">Sin saldos históricos registrados manualmente</div>'; return; }
-    const mesesNom = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    let html = '<table><thead><tr><th>Periodo</th><th>Ingresos</th><th>Egresos</th><th>Resultado</th><th>Observación</th><th>Acciones</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const h = d.data(); const res = (h.ingresos||0)-(h.egresos||0);
-      html += `<tr>
-        <td><strong>${mesesNom[h.mes]||'—'} ${h.anio||'—'}</strong></td>
-        <td style="color:var(--verde)">$${Number(h.ingresos||0).toLocaleString('es-CL')}</td>
-        <td style="color:#dc2626">$${Number(h.egresos||0).toLocaleString('es-CL')}</td>
-        <td style="font-weight:700;color:${res>=0?'var(--verde)':'#dc2626'}">$${res.toLocaleString('es-CL')}</td>
-        <td style="font-size:12px;color:#666">${h.observacion||'—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick="editarSaldoHistorico('${d.id}',${JSON.stringify(h).replace(/'/g,'&#39;')})">✏️</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarSaldoHistorico('${d.id}','${mesesNom[h.mes]} ${h.anio}')">🗑️</button>
-        </td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-    div.innerHTML = html;
-  } catch(e) { div.innerHTML = `<div style="padding:16px;color:#dc2626">Error: ${e.message}</div>`; }
-}
-
-function editarSaldoHistorico(id, datos) {
-  abrirRegistrarSaldoMes();
-  setTimeout(() => {
-    document.getElementById('sm-mes').value = datos.mes;
-    document.getElementById('sm-anio').value = datos.anio;
-    document.getElementById('sm-ingresos').value = datos.ingresos||0;
-    document.getElementById('sm-egresos').value = datos.egresos||0;
-    document.getElementById('sm-obs').value = datos.observacion||'';
-    // Override guardar para actualizar en lugar de crear
-    const btn = document.querySelector('#modal-saldo-mes button.btn-verde');
-    if(btn) btn.onclick = async () => {
-      const mes = parseInt(document.getElementById('sm-mes').value);
-      const anio = parseInt(document.getElementById('sm-anio').value);
-      const ingresos = Number(document.getElementById('sm-ingresos').value)||0;
-      const egresos = Number(document.getElementById('sm-egresos').value)||0;
-      const obs = document.getElementById('sm-obs').value;
-      try {
-        await db.collection('balance_historico').doc(id).update({mes,anio,ingresos,egresos,observacion:obs,fechaActualizacion:new Date().toISOString()});
-        document.getElementById('modal-saldo-mes').remove();
-        alert('✅ Saldo actualizado.');
-        cargarSaldosHistoricos(); cargarBalance();
-      } catch(e) { alert('Error: '+e.message); }
-    };
-  }, 100);
-}
-
-async function eliminarSaldoHistorico(id, nombre) {
-  if (!confirm(`¿Eliminar el registro de ${nombre}?`)) return;
-  try {
-    await db.collection('balance_historico').doc(id).delete();
-    cargarSaldosHistoricos(); cargarBalance();
-  } catch(e) { alert('Error: '+e.message); }
-}
-
-function abrirImportarBalanceExcel() {
-  const m = document.createElement('div');
-  m.id = 'modal-import-balance';
-  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
-      <h3 style="margin-bottom:6px;color:#1d4ed8">📥 Importar meses históricos</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas requeridas: <strong>mes, anio (o año), ingresos, egresos</strong>. Acepta .xlsx y .csv.</p>
-      <input type="file" id="imp-bal-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
-      <div id="imp-bal-status" style="margin-bottom:12px;font-size:13px;min-height:20px"></div>
-      <div id="imp-bal-preview" style="max-height:260px;overflow-y:auto;margin-bottom:16px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-import-balance').remove()">Cancelar</button>
-        <button id="btn-imp-bal" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportBalance()">✅ Importar</button>
-      </div>
-    </div>`;
-  document.body.appendChild(m);
-  document.getElementById('imp-bal-file').addEventListener('change', e => {
-    const file = e.target.files[0]; if(!file) return;
-    const status = document.getElementById('imp-bal-status');
-    status.innerHTML = '⏳ Leyendo...';
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try {
-        const data = new Uint8Array(ev.target.result);
-        const wb = XLSX.read(data,{type:'array'});
-        let rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-        window._importBalRows = rows.filter(r => r.ingresos||r.egresos).map(r => ({
-          mes: parseInt(r.mes||r.Mes||1), anio: parseInt(r.anio||r.año||r.Anio||r.Año||2026),
-          ingresos: Number(String(r.ingresos||0).replace(/[^0-9]/g,'')),
-          egresos: Number(String(r.egresos||0).replace(/[^0-9]/g,'')),
-          observacion: String(r.observacion||r.obs||'')
-        })).filter(r=>r.mes>=1&&r.mes<=12&&r.anio>2000);
-        status.innerHTML = `✅ ${window._importBalRows.length} registros encontrados.`;
-        document.getElementById('btn-imp-bal').style.display='inline-block';
-      } catch(err) { status.innerHTML='❌ Error: '+err.message; }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-async function ejecutarImportBalance() {
-  if(!window._importBalRows||!window._importBalRows.length) return;
-  let ok=0;
-  for(const r of window._importBalRows){
-    try { await db.collection('balance_historico').doc(`${r.anio}-${String(r.mes).padStart(2,'0')}`).set({...r,manual:true,fechaRegistro:new Date().toISOString()}); ok++; } catch(e){}
-  }
-  alert(`✅ ${ok} meses importados.`);
-  document.getElementById('modal-import-balance').remove();
-  cargarSaldosHistoricos(); cargarBalance();
-}
-
-async function cargarBalance() {
-  const anio = document.getElementById('bal-anio').value;
-  const div = document.getElementById('bal-tabla');
-  div.innerHTML = '<div style="padding:24px;text-align:center;color:#999">Calculando...</div>';
-
-  // Cargar pagos, egresos y cierres cerrados
-  const [pagosSnap, egresosSnap, cierresSnap] = await Promise.all([
-    db.collection('pagos').get(),
-    db.collection('egresos').get(),
-    db.collection('cierres_mes').get()
-  ]);
-
-  const mesesNom = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const datos = Array.from({length:12}, (_,i) => ({mes:i+1, nombre:mesesNom[i], ingresos:0, egresos:0, cerrado:false}));
-
-  pagosSnap.forEach(d => {
-    const p = d.data();
-    if (p.tipo === 'Ajuste') return;
-    if (!p.fecha || !p.fecha.startsWith(anio)) return;
-    const mes = parseInt(p.fecha.split('-')[1])-1;
-    if (mes>=0 && mes<12) datos[mes].ingresos += Number(p.monto||0);
-  });
-
-  egresosSnap.forEach(d => {
-    const e = d.data();
-    if (!e.fecha || !e.fecha.startsWith(anio)) return;
-    const mes = parseInt(e.fecha.split('-')[1])-1;
-    if (mes>=0 && mes<12) datos[mes].egresos += Number(e.monto||0);
-  });
-
-  cierresSnap.forEach(d => {
-    const cl = d.data();
-    if (cl.anio == anio) { const idx = cl.mes-1; if (idx>=0&&idx<12) datos[idx].cerrado = true; }
-  });
-
-  let totalIng=0, totalEgr=0;
-  let saldoAcum = 0;
-  let html = `<table style="width:100%;border-collapse:collapse">
-    <thead><tr style="background:#1a7a4a;color:white">
-      <th style="padding:10px;text-align:left">Mes</th>
-      <th style="padding:10px;text-align:right">Ingresos</th>
-      <th style="padding:10px;text-align:right">Egresos</th>
-      <th style="padding:10px;text-align:right">Resultado</th>
-      <th style="padding:10px;text-align:right">Saldo acum.</th>
-      <th style="padding:10px;text-align:center">Estado</th>
-    </tr></thead><tbody>`;
-
-  datos.forEach(m => {
-    const result = m.ingresos - m.egresos;
-    saldoAcum += result;
-    totalIng += m.ingresos;
-    totalEgr += m.egresos;
-    const color = result >= 0 ? 'var(--verde)' : '#e53935';
-    html += `<tr style="border-bottom:1px solid #eee;${m.cerrado?'opacity:0.75;background:#f9f9f9':''}">
-      <td style="padding:10px;font-weight:600">${m.nombre} ${anio}</td>
-      <td style="padding:10px;text-align:right;color:var(--verde)">$${m.ingresos.toLocaleString('es-CL')}</td>
-      <td style="padding:10px;text-align:right;color:#e53935">$${m.egresos.toLocaleString('es-CL')}</td>
-      <td style="padding:10px;text-align:right;font-weight:700;color:${color}">$${result.toLocaleString('es-CL')}</td>
-      <td style="padding:10px;text-align:right">$${saldoAcum.toLocaleString('es-CL')}</td>
-      <td style="padding:10px;text-align:center">${m.cerrado?'<span style="background:#e8f5ee;color:var(--verde);padding:3px 10px;border-radius:20px;font-size:12px">🔒 Cerrado</span>':'<span style="background:#fef9c3;color:#92400e;padding:3px 10px;border-radius:20px;font-size:12px">⏳ Abierto</span>'}</td>
-    </tr>`;
-  });
-
-  const resAno = totalIng - totalEgr;
-  html += `</tbody><tfoot><tr style="background:#0f4a2c;color:white;font-weight:700">
-    <td style="padding:12px">TOTAL ${anio}</td>
-    <td style="padding:12px;text-align:right">$${totalIng.toLocaleString('es-CL')}</td>
-    <td style="padding:12px;text-align:right">$${totalEgr.toLocaleString('es-CL')}</td>
-    <td style="padding:12px;text-align:right;color:${resAno>=0?'#86efac':'#fca5a5'}">$${resAno.toLocaleString('es-CL')}</td>
-    <td style="padding:12px;text-align:right">$${saldoAcum.toLocaleString('es-CL')}</td>
-    <td></td>
-  </tr></tfoot></table>`;
-
-  div.innerHTML = html;
-  document.getElementById('bal-total-ing').textContent = '$'+totalIng.toLocaleString('es-CL');
-  document.getElementById('bal-total-egr').textContent = '$'+totalEgr.toLocaleString('es-CL');
-  document.getElementById('bal-resultado').textContent = '$'+resAno.toLocaleString('es-CL');
-  document.getElementById('bal-card-result').style.borderColor = resAno>=0?'var(--verde)':'#e53935';
-}
-
-function exportarBalanceExcel() {
-  const tabla = document.querySelector('#bal-tabla table');
-  if (!tabla) return;
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.table_to_sheet(tabla);
-  XLSX.utils.book_append_sheet(wb, ws, 'Balance');
-  XLSX.writeFile(wb, 'Balance_Mensual_Las_Araucarias.xlsx');
-}
-
-// ===================== CIERRE DE MES =====================
-function mostrarCierreMes() {
-  const c = document.getElementById('content');
-  const ahora = new Date();
-  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  c.innerHTML = `
-    <div style="max-width:680px;margin:0 auto">
-      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:20px;margin-bottom:24px">
-        <p style="font-weight:700;color:#856404;margin-bottom:6px">⚠️ ¿Qué hace el cierre de mes?</p>
-        <p style="font-size:13px;color:#856404">El cierre marca el mes como <strong>bloqueado</strong> en el Balance Mensual, igual que en Comunidad Feliz. Los registros existentes <strong>no se eliminan</strong>, pero quedan señalados como periodo cerrado. Una vez cerrado, se inicia el seguimiento del nuevo mes desde cero.</p>
-      </div>
-
-      <div class="tabla-wrap" style="margin-bottom:24px">
-        <div class="tabla-header"><h3>Historial de cierres</h3></div>
-        <div id="lista-cierres"><div style="padding:20px;text-align:center;color:#999">Cargando...</div></div>
-      </div>
-
-      <div style="background:white;border:1px solid var(--borde);border-radius:12px;padding:24px">
-        <h3 style="margin-bottom:16px;color:var(--verde4)">🔒 Realizar cierre de mes</h3>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
-          <div>
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:#666">Mes</label>
-            <select id="cierre-mes" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-              ${meses.map((m,i)=>`<option value="${i+1}" ${i===ahora.getMonth()?'selected':''}>${m}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:#666">Año</label>
-            <select id="cierre-anio" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-              ${[ahora.getFullYear()-1,ahora.getFullYear(),ahora.getFullYear()+1].map(y=>`<option value="${y}" ${y===ahora.getFullYear()?'selected':''}>${y}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:#666">Observación (opcional)</label>
-            <input id="cierre-obs" placeholder="Ej: Cierre junio 2026 aprobado en asamblea" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;width:300px">
-          </div>
-        </div>
-        <div id="cierre-resumen" style="margin-bottom:16px"></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-verde" onclick="previsualizarCierre()">🔍 Previsualizar mes</button>
-          <button id="btn-confirmar-cierre" class="btn" style="background:#c0392b;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;display:none" onclick="confirmarCierre()">🔒 Confirmar cierre</button>
-        </div>
-      </div>
-    </div>`;
-  cargarHistorialCierres();
-}
-
-async function cargarHistorialCierres() {
-  const div = document.getElementById('lista-cierres');
-  const snap = await db.collection('cierres_mes').orderBy('fechaCierre','desc').get();
-  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  if (snap.empty) { div.innerHTML = '<div style="padding:20px;text-align:center;color:#999">No hay cierres registrados aún.</div>'; return; }
-  let html = '<table><thead><tr><th>Periodo</th><th>Ingresos</th><th>Egresos</th><th>Resultado</th><th>Cerrado por</th><th>Fecha cierre</th><th></th></tr></thead><tbody>';
-  snap.forEach(d => {
-    const cl = d.data();
-    const res = (cl.totalIngresos||0)-(cl.totalEgresos||0);
-    html += `<tr>
-      <td><strong>${meses[cl.mes]} ${cl.anio}</strong></td>
-      <td style="color:var(--verde)">$${Number(cl.totalIngresos||0).toLocaleString('es-CL')}</td>
-      <td style="color:#e53935">$${Number(cl.totalEgresos||0).toLocaleString('es-CL')}</td>
-      <td style="font-weight:700;color:${res>=0?'var(--verde)':'#e53935'}">$${res.toLocaleString('es-CL')}</td>
-      <td>${cl.usuario||'Admin'}</td>
-      <td>${cl.fechaCierre ? cl.fechaCierre.split('T')[0] : '—'}</td>
-      <td><button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="reabrirMes('${d.id}','${meses[cl.mes]} ${cl.anio}')">🔓 Reabrir</button></td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
-  div.innerHTML = html;
-}
-
-async function previsualizarCierre() {
-  const mes = parseInt(document.getElementById('cierre-mes').value);
-  const anio = document.getElementById('cierre-anio').value;
-  const div = document.getElementById('cierre-resumen');
-  const btn = document.getElementById('btn-confirmar-cierre');
-  div.innerHTML = '<div style="padding:12px;color:#999">Calculando...</div>';
-
-  // Verificar si ya está cerrado
-  const existeSnap = await db.collection('cierres_mes').where('mes','==',mes).where('anio','==',parseInt(anio)).get();
-  if (!existeSnap.empty) {
-    div.innerHTML = `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:14px;color:#991b1b">⚠️ Este mes ya fue cerrado. Si deseas modificarlo, primero reabre el periodo desde el historial.</div>`;
-    btn.style.display = 'none'; return;
-  }
-
-  const prefix = `${anio}-${String(mes).padStart(2,'0')}`;
-  const [pagosSnap, egresosSnap] = await Promise.all([
-    db.collection('pagos').get(),
-    db.collection('egresos').get()
-  ]);
-  let ingresos=0, egresos=0, cantPagos=0, cantEgr=0;
-  pagosSnap.forEach(d => { const p=d.data(); if(p.tipo!=='Ajuste'&&p.fecha&&p.fecha.startsWith(prefix)) { ingresos+=Number(p.monto||0); cantPagos++; } });
-  egresosSnap.forEach(d => { const e=d.data(); if(e.fecha&&e.fecha.startsWith(prefix)) { egresos+=Number(e.monto||0); cantEgr++; } });
-  const resultado = ingresos - egresos;
-  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  div.innerHTML = `
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px">
-      <p style="font-weight:700;color:var(--verde4);margin-bottom:12px">Resumen — ${meses[mes]} ${anio}</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
-        <div><div style="font-size:20px;font-weight:700;color:var(--verde)">$${ingresos.toLocaleString('es-CL')}</div><div style="font-size:12px;color:#666">${cantPagos} pagos recibidos</div></div>
-        <div><div style="font-size:20px;font-weight:700;color:#e53935">$${egresos.toLocaleString('es-CL')}</div><div style="font-size:12px;color:#666">${cantEgr} egresos registrados</div></div>
-        <div><div style="font-size:20px;font-weight:700;color:${resultado>=0?'var(--verde)':'#e53935'}">$${resultado.toLocaleString('es-CL')}</div><div style="font-size:12px;color:#666">Resultado neto</div></div>
-      </div>
-    </div>`;
-  btn.style.display = 'inline-block';
-  btn.dataset.mes = mes;
-  btn.dataset.anio = anio;
-  btn.dataset.ingresos = ingresos;
-  btn.dataset.egresos = egresos;
-}
-
-async function confirmarCierre() {
-  const btn = document.getElementById('btn-confirmar-cierre');
-  const mes = parseInt(btn.dataset.mes);
-  const anio = parseInt(btn.dataset.anio);
-  const ingresos = Number(btn.dataset.ingresos);
-  const egresos = Number(btn.dataset.egresos);
-  const obs = document.getElementById('cierre-obs').value.trim();
-  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  if (!confirm(`¿Confirmar cierre de ${meses[mes]} ${anio}?\n\nEste mes quedará bloqueado en el Balance.\nAl confirmar, se sumará automáticamente el GC del mes a las unidades que no pagaron.\n\nLos registros NO se eliminan.`)) return;
-
-  try {
-    // Guardar cierre
-    await db.collection('cierres_mes').add({
-      mes, anio, totalIngresos: ingresos, totalEgresos: egresos,
-      observacion: obs,
-      usuario: auth.currentUser ? auth.currentUser.email : 'Admin',
-      fechaCierre: new Date().toISOString()
-    });
-
-    // PUNTO 7: Sumar GC del mes a residentes que NO pagaron en ese período
-    const prefix = `${anio}-${String(mes).padStart(2,'0')}`;
-    const [resSnap, pagosSnap] = await Promise.all([
-      db.collection('residentes').get(),
-      db.collection('pagos').where('tipo','!=','Ajuste').get()
-    ]);
-
-    // Unidades que SÍ pagaron en el mes
-    const pagaronEste = new Set();
-    pagosSnap.forEach(d => {
-      const p = d.data();
-      if (p.fecha && p.fecha.startsWith(prefix) && p.tipo !== 'Ajuste') pagaronEste.add(String(p.unidad||''));
-    });
-
-    // Sumar GC a los que NO pagaron
-    let actualizados = 0;
-    const batch = [];
-    resSnap.forEach(d => {
-      const r = d.data();
-      const u = String(r.unidad||'');
-      if (!pagaronEste.has(u)) {
-        // Determinar monto GC según tipo de unidad
-        const gcMes = (parseInt(u) > 100) ? 6000 : 22000;
-        batch.push(d.ref.update({ deuda: (r.deuda||0) + gcMes }));
-        actualizados++;
-      }
-    });
-    await Promise.all(batch);
-
-    // Asiento contable del cierre
-    await db.collection('libro_diario').add({
-      fecha: `${anio}-${String(mes).padStart(2,'0')}-30`,
-      glosa: `Cierre mes ${meses[mes]} ${anio} — ${actualizados} unidades con GC sumado automáticamente`,
-      cuentaDebe: 'Ingresos gastos comunes devengados',
-      montoDebe: ingresos,
-      cuentaHaber: 'Gastos pagados del mes',
-      montoHaber: egresos,
-      documento: `CIERRE-${anio}${String(mes).padStart(2,'0')}`,
-      origen: 'cierre_mes'
-    });
-
-    btn.style.display = 'none';
-    document.getElementById('cierre-resumen').innerHTML = `
-      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px;color:var(--verde4)">
-        ✅ Cierre de <strong>${meses[mes]} ${anio}</strong> registrado exitosamente.<br>
-        📋 GC del mes sumado automáticamente a <strong>${actualizados}</strong> unidades sin pago registrado.<br>
-        📒 Asiento de cierre generado en Libro Diario.
-      </div>`;
-    cargarHistorialCierres();
-  } catch(e) { alert('Error al registrar cierre: ' + e.message); }
-}
-
-async function reabrirMes(id, nombreMes) {
-  if (!confirm(`¿Reabrir el periodo ${nombreMes}?\n\nEsto eliminará el registro de cierre y el mes volverá a aparecer como Abierto en el Balance.`)) return;
-  try {
-    await db.collection('cierres_mes').doc(id).delete();
-    cargarHistorialCierres();
-  } catch(e) { alert('Error: ' + e.message); }
-}
-
-// ===================== PUNTO 9: PAGO DE SUELDOS — TRABAJADORES =====================
-function mostrarTrabajadores() {
-  const c = document.getElementById('content');
-  c.innerHTML = `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-verde" onclick="abrirModalTrabajador()">+ Agregar trabajador</button>
-    </div>
-    <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Trabajadores</h3></div>
-      <div id="lista-trabajadores"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
-    </div>
-    <div class="tabla-wrap" style="margin-top:20px">
-      <div class="tabla-header"><h3>📋 Historial de pagos de sueldos</h3></div>
-      <div id="lista-sueldos-pagados"><div style="padding:16px;text-align:center;color:#999">Cargando...</div></div>
-    </div>
-    <div id="modal-trabajador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
-      <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 style="margin-bottom:20px;color:var(--verde4)">Agregar trabajador</h3>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <input id="tr-nombre" placeholder="Nombre completo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-rut" placeholder="RUT" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <select id="tr-cargo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-            <option>Conserje</option><option>Portero</option><option>Jardinero</option><option>Aseo</option><option>Administrador</option><option>Otro</option>
-          </select>
-          <input id="tr-telefono" placeholder="Teléfono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-correo" placeholder="Correo electrónico" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-ingreso" type="date" placeholder="Fecha de ingreso" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-sueldo" placeholder="Sueldo bruto ($)" type="number" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-          <button class="btn btn-outline" onclick="cerrarModalTrabajador()">Cancelar</button>
-          <button class="btn btn-verde" onclick="guardarTrabajador()">Guardar</button>
-        </div>
-      </div>
-    </div>`;
-  db.collection('trabajadores').get().then(snap => {
-    if (snap.empty) { document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores registrados</div>'; return; }
-    let html='<table><thead><tr><th>Nombre</th><th>RUT</th><th>Cargo</th><th>Teléfono</th><th>Ingreso</th><th>Sueldo bruto</th><th>Acciones</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const tr=d.data();
-      html+=`<tr>
-        <td>${tr.nombre||'—'}</td><td>${tr.rut||'—'}</td>
-        <td><span class="badge badge-gris">${tr.cargo||'—'}</span></td>
-        <td>${tr.telefono||'—'}</td>
-        <td>${tr.ingreso||'—'}</td>
-        <td>$${Number(tr.sueldo||0).toLocaleString('es-CL')}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm btn-verde" onclick="abrirPagarSueldo('${d.id}','${(tr.nombre||'').replace(/'/g,'')}',${tr.sueldo||0})">💵 Pagar sueldo</button>
-        </td>
-      </tr>`;
-    });
-    html+='</tbody></table>';
-    document.getElementById('lista-trabajadores').innerHTML=html;
-  }).catch(()=>{ document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores aún</div>'; });
-
-  // Cargar historial de sueldos pagados
-  db.collection('egresos').where('categoria','==','RR.HH.').orderBy('fecha','desc').get().then(snap => {
-    if(snap.empty){ document.getElementById('lista-sueldos-pagados').innerHTML='<div style="padding:16px;text-align:center;color:#999">Sin pagos de sueldo registrados</div>'; return; }
-    let html='<table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Monto</th><th>Forma pago</th><th>Documento</th><th>Comprobante</th></tr></thead><tbody>';
-    snap.forEach(d=>{
-      const e=d.data();
-      const datosStr=JSON.stringify(e).replace(/'/g,'&#39;');
-      html+=`<tr><td>${e.fecha||'—'}</td><td>${e.descripcion||'—'}</td><td style="text-align:right">$${Number(e.monto||0).toLocaleString('es-CL')}</td><td>${e.forma||'—'}</td><td>${e.documento||'—'}</td>
-        <td><button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick='descargarComprobanteEgreso(${datosStr})'>📄 PDF</button></td></tr>`;
-    });
-    html+='</tbody></table>';
-    document.getElementById('lista-sueldos-pagados').innerHTML=html;
-  }).catch(()=>{});
-}
-
-function abrirPagarSueldo(idTrabajador, nombre, sueldoBruto) {
-  const m = document.createElement('div');
-  m.id = 'modal-pagar-sueldo';
-  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-      <h3 style="margin-bottom:6px;color:var(--verde4)">💵 Pagar sueldo</h3>
-      <p style="font-size:13px;color:#666;margin-bottom:20px">Trabajador: <strong>${nombre}</strong></p>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Fecha de pago</label>
-          <input id="ps-fecha" type="date" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Monto a pagar ($)</label>
-          <input id="ps-monto" type="number" value="${sueldoBruto}" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Forma de pago</label>
-          <select id="ps-forma" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-            <option>Transferencia</option><option>Efectivo</option><option>Cheque</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Liquidación / Documento</label>
-          <input id="ps-documento" placeholder="Ej: Liquidación junio 2026" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div style="background:#fef9c3;border-radius:8px;padding:10px;font-size:12px;color:#713f12">
-          💡 El pago se registrará como egreso en la categoría <strong>RR.HH.</strong> y generará asiento automático en el Libro Diario.
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-        <button class="btn btn-outline" onclick="document.getElementById('modal-pagar-sueldo').remove()">Cancelar</button>
-        <button class="btn btn-verde" onclick="ejecutarPagoSueldo('${nombre}')">💵 Confirmar pago</button>
-      </div>
-    </div>`;
-  document.body.appendChild(m);
-  document.getElementById('ps-fecha').value = new Date().toISOString().split('T')[0];
-}
-
-async function ejecutarPagoSueldo(nombre) {
-  const fecha = document.getElementById('ps-fecha').value;
-  const monto = Number(document.getElementById('ps-monto').value)||0;
-  const forma = document.getElementById('ps-forma').value;
-  const documento = document.getElementById('ps-documento').value;
-  if (!monto) { alert('Ingresa el monto'); return; }
-  const datos = {
-    fecha, categoria: 'RR.HH.', descripcion: `Sueldo ${nombre}`,
-    proveedor: nombre, monto, forma, documento,
-    fechaRegistro: new Date().toISOString()
-  };
-  try {
-    // Registrar como egreso
-    const ref = await db.collection('egresos').add(datos);
-    // Asiento contable automático
-    await db.collection('libro_diario').add({
-      fecha,
-      glosa: `Pago sueldo ${nombre}`,
-      cuentaDebe: 'Gastos de personal',
-      montoDebe: monto,
-      cuentaHaber: forma==='Efectivo'?'Caja chica':'Banco Estado',
-      montoHaber: monto,
-      documento: documento||'',
-      origen: 'sueldo_automatico',
-      referenciaId: ref.id
-    });
-    document.getElementById('modal-pagar-sueldo').remove();
-    alert(`✅ Sueldo de ${nombre} registrado como egreso y asiento contable generado.`);
-    // Descargar comprobante automáticamente
-    descargarComprobanteEgreso(datos);
-    mostrarTrabajadores();
-  } catch(e) { alert('Error: '+e.message); }
-}
-
-function abrirModalTrabajador(){document.getElementById('modal-trabajador').style.display='flex';}
-function cerrarModalTrabajador(){document.getElementById('modal-trabajador').style.display='none';}
-function guardarTrabajador(){
-  const datos={nombre:document.getElementById('tr-nombre').value,rut:document.getElementById('tr-rut').value,cargo:document.getElementById('tr-cargo').value,telefono:document.getElementById('tr-telefono').value,correo:document.getElementById('tr-correo').value,ingreso:document.getElementById('tr-ingreso').value,sueldo:Number(document.getElementById('tr-sueldo').value)||0};
-  if(!datos.nombre){alert('Ingresa el nombre');return;}
-  db.collection('trabajadores').add(datos).then(()=>{cerrarModalTrabajador();mostrarTrabajadores();}).catch(e=>alert('Error: '+e.message));
-}
-
-// ===================== PUNTO 9: LIBRO DIARIO AUTO desde ingresos/egresos =====================
-// Los registros automáticos ya se hacen en guardarPago() y guardarEgreso() arriba.
-// El libro diario también recibe asientos manuales con su botón + Nuevo asiento.
 
 </script>
 </body>
