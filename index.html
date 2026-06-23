@@ -950,7 +950,7 @@ async function guardarPago() {
     // Guardar en colección pagos
     const ref = await db.collection('pagos').add(datos);
 
-    // Descontar deuda del residente al registrar pago (punto 7)
+    // Descontar deuda del residente al registrar pago O ajuste
     const rSnap = await db.collection('residentes').where('unidad','==',String(datos.unidad)).get();
     if (!rSnap.empty) {
       const rDoc = rSnap.docs[0];
@@ -1076,12 +1076,16 @@ function mostrarGastos() {
   const c = document.getElementById('content');
   c.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
+      <button class="btn btn-outline" onclick="exportarGastosExcel()">📊 Exportar Excel</button>
+      <button class="btn btn-verde" style="background:#1d4ed8" onclick="importarGastosExcel()">📥 Importar Excel</button>
       <button class="btn btn-verde" onclick="abrirModalGasto()">+ Nuevo gasto común</button>
     </div>
     <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Gastos comunes — Julio 2026</h3><span style="font-size:12px;color:var(--texto2)">75 unidades · Cargados desde planilla oficial</span></div>
-      <div id="lista-gastos"></div>
+      <div class="tabla-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Gastos comunes</h3>
+        <span style="font-size:12px;color:var(--texto2)" id="gc-subtitulo">Cargando...</span>
+      </div>
+      <div id="lista-gastos"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
     </div>
     <div id="modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center">
       <div style="background:white;border-radius:16px;padding:28px;width:400px;max-width:90vw">
@@ -1101,31 +1105,81 @@ function mostrarGastos() {
   renderGastosTabla();
 }
 
-function renderGastosTabla() {
+// Variable global para datos importados de gastos
+let _datosGastosImportados = null;
+
+async function renderGastosTabla() {
+  const div = document.getElementById('lista-gastos');
+  const subtitulo = document.getElementById('gc-subtitulo');
+
+  // Intentar cargar desde Firestore primero
+  try {
+    const gcSnap = await db.collection('gastos_comunes_planilla').orderBy('unidad').get();
+    
+    if (!gcSnap.empty) {
+      // Cargar pagos para cruzar saldos reales
+      const pagosSnap = await db.collection('pagos').get();
+      const pagosMap = {};
+      pagosSnap.forEach(d => {
+        const p = d.data();
+        const u = String(p.unidad||'');
+        if (!pagosMap[u]) pagosMap[u] = 0;
+        if (p.tipo !== 'Ajuste') pagosMap[u] += Number(p.monto||0);
+      });
+
+      const datos = [];
+      gcSnap.forEach(d => datos.push({...d.data(), _id: d.id}));
+      if(subtitulo) subtitulo.textContent = `${datos.length} unidades · Importado desde planilla`;
+      renderTablaDatos(datos, pagosMap, div);
+      return;
+    }
+  } catch(e) {}
+
+  // Si no hay datos en Firestore, usar la tabla estática
+  if(subtitulo) subtitulo.textContent = `${GASTOS_JULIO_2026.length} unidades · Planilla julio 2026`;
+  renderTablaDatos(GASTOS_JULIO_2026, {}, div);
+}
+
+function renderTablaDatos(datos, pagosMap, div) {
+  // Detectar columnas disponibles
+  const tieneCargos = datos.some(g => g.cargos !== undefined);
+  
   let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
-    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>GC Egresos</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th>
+    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>GC Egresos</th><th>Total Mes</th>
+    <th>Capital Atrasado</th><th>Intereses</th>${tieneCargos?'<th>Cargos</th>':''}
+    <th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th>Pagado Sistema</th><th>Saldo Real</th>
   </tr></thead><tbody>`;
-  GASTOS_JULIO_2026.forEach(g => {
-    const deudaTotal = g.capitalAtrasado + g.intereses;
-    const rowColor = deudaTotal > 66000 ? '#fff5f5' : g.saldoFavor > 0 ? '#f0fdf4' : '';
+
+  let totProrrateo=0, totCapital=0, totIntereses=0, totCobrado=0, totSaldo=0, totCargos=0;
+
+  datos.forEach(g => {
+    const deudaTotal = (g.capitalAtrasado||0) + (g.intereses||0);
+    const rowColor = deudaTotal > 66000 ? '#fff5f5' : (g.saldoFavor||0) > 0 ? '#f0fdf4' : '';
+    const pagadoSistema = pagosMap[String(g.unidad||'')] || 0;
+    const saldoReal = (g.totalCobrado||0) - pagadoSistema;
+    totProrrateo += g.prorrateo||0;
+    totCapital += g.capitalAtrasado||0;
+    totIntereses += g.intereses||0;
+    totCobrado += g.totalCobrado||0;
+    totSaldo += g.saldoFavor||0;
+    totCargos += g.cargos||0;
     html += `<tr style="background:${rowColor}">
       <td><strong>${g.unidad}</strong></td>
-      <td>${g.residente}</td>
-      <td style="text-align:right">$${g.prorrateo.toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${g.gcEgresos.toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${g.totalMes.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.capitalAtrasado>0?'color:#dc2626;font-weight:600':''}">$${g.capitalAtrasado.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.intereses>0?'color:#f97316':''}">$${g.intereses.toLocaleString('es-CL')}</td>
-      <td style="text-align:right">$${g.abonos.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;font-weight:600">$${g.totalCobrado.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.saldoFavor>0?'color:#16a34a;font-weight:600':''}">$${g.saldoFavor.toLocaleString('es-CL')}</td>
+      <td>${g.residente||'—'}</td>
+      <td style="text-align:right">$${(g.prorrateo||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${(g.gcEgresos||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right">$${(g.totalMes||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${(g.capitalAtrasado||0)>0?'color:#dc2626;font-weight:600':''}">$${(g.capitalAtrasado||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${(g.intereses||0)>0?'color:#f97316':''}">$${(g.intereses||0).toLocaleString('es-CL')}</td>
+      ${tieneCargos?`<td style="text-align:right">$${(g.cargos||0).toLocaleString('es-CL')}</td>`:''}
+      <td style="text-align:right">$${(g.abonos||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right;font-weight:600">$${(g.totalCobrado||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right;${(g.saldoFavor||0)>0?'color:#16a34a;font-weight:600':''}">$${(g.saldoFavor||0).toLocaleString('es-CL')}</td>
+      <td style="text-align:right;color:#1d4ed8">$${pagadoSistema.toLocaleString('es-CL')}</td>
+      <td style="text-align:right;font-weight:700;color:${saldoReal>0?'#dc2626':'#16a34a'}">$${saldoReal.toLocaleString('es-CL')}</td>
     </tr>`;
   });
-  const totProrrateo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.prorrateo,0);
-  const totCapital = GASTOS_JULIO_2026.reduce((s,g)=>s+g.capitalAtrasado,0);
-  const totIntereses = GASTOS_JULIO_2026.reduce((s,g)=>s+g.intereses,0);
-  const totCobrado = GASTOS_JULIO_2026.reduce((s,g)=>s+g.totalCobrado,0);
-  const totSaldo = GASTOS_JULIO_2026.reduce((s,g)=>s+g.saldoFavor,0);
+
   html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700">
     <td colspan="2">TOTALES</td>
     <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
@@ -1133,11 +1187,138 @@ function renderGastosTabla() {
     <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#dc2626">$${totCapital.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#f97316">$${totIntereses.toLocaleString('es-CL')}</td>
+    ${tieneCargos?`<td style="text-align:right">$${totCargos.toLocaleString('es-CL')}</td>`:''}
     <td style="text-align:right">$0</td>
     <td style="text-align:right">$${totCobrado.toLocaleString('es-CL')}</td>
     <td style="text-align:right;color:#16a34a">$${totSaldo.toLocaleString('es-CL')}</td>
+    <td colspan="2"></td>
   </tr></tfoot></table></div>`;
-  document.getElementById('lista-gastos').innerHTML = html;
+  div.innerHTML = html;
+}
+
+function importarGastosExcel() {
+  const m = document.createElement('div');
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 style="margin-bottom:6px;color:#1d4ed8">📥 Importar Gastos Comunes desde Excel</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:16px">El sistema importa <strong>todas las columnas</strong> tal cual están en tu planilla. Columnas reconocidas: unidad, residente, prorrateo, gcEgresos, totalMes, capitalAtrasado, intereses, cargos, abonos, totalCobrado, saldoFavor.</p>
+      <div style="background:#fef9c3;border-radius:8px;padding:10px;font-size:12px;color:#713f12;margin-bottom:12px">
+        ⚠️ Al importar se <strong>reemplazarán</strong> los datos actuales de la planilla.
+      </div>
+      <input type="file" id="imp-gc-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
+      <div id="imp-gc-status" style="margin-bottom:8px;font-size:13px;min-height:20px"></div>
+      <div id="imp-gc-preview" style="max-height:260px;overflow-y:auto;margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="this.closest('div[style*=fixed]').remove()">Cancelar</button>
+        <button id="btn-imp-gc" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportGastos()">✅ Importar planilla</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+
+  document.getElementById('imp-gc-file').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const status = document.getElementById('imp-gc-status');
+    const preview = document.getElementById('imp-gc-preview');
+    status.innerHTML = '⏳ Leyendo archivo...';
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        let rows = [];
+        if (file.name.endsWith('.csv')) {
+          const lines = ev.target.result.split('\n').filter(l => l.trim());
+          const headers = lines[0].split(/[,;]/).map(h => h.trim().replace(/^"|"$/g,''));
+          for (let i=1; i<lines.length; i++) {
+            const vals = lines[i].split(/[,;]/);
+            const obj = {};
+            headers.forEach((h,idx) => obj[h] = (vals[idx]||'').trim().replace(/^"|"$/g,''));
+            rows.push(obj);
+          }
+        } else {
+          const data = new Uint8Array(ev.target.result);
+          const wb = XLSX.read(data, {type:'array'});
+          rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
+        }
+
+        // Mapear columnas flexiblemente
+        const mapCol = (row, posibles) => {
+          for (const p of posibles) {
+            const k = Object.keys(row).find(k => k.toLowerCase().replace(/\s/g,'').replace(/[^a-záéíóúñ]/gi,'') === p.toLowerCase().replace(/\s/g,'').replace(/[^a-záéíóúñ]/gi,''));
+            if (k && row[k] !== '' && row[k] !== null) return row[k];
+          }
+          return '';
+        };
+
+        window._importGCRows = rows.map(r => {
+          const unidad = String(mapCol(r,['unidad','unit','dpto'])||'').trim();
+          if (!unidad) return null;
+          return {
+            unidad,
+            residente: String(mapCol(r,['residente','nombre','propietario'])||'').trim(),
+            prorrateo: Number(String(mapCol(r,['prorrateo','prorratio'])||0).replace(/[^0-9.-]/g,'')),
+            gcEgresos: Number(String(mapCol(r,['gcEgresos','gcegresos','gc egresos','egresos'])||0).replace(/[^0-9.-]/g,'')),
+            totalMes: Number(String(mapCol(r,['totalMes','totalmes','total mes','total_mes'])||0).replace(/[^0-9.-]/g,'')),
+            capitalAtrasado: Number(String(mapCol(r,['capitalAtrasado','capitalatrasado','capital atrasado','capital'])||0).replace(/[^0-9.-]/g,'')),
+            intereses: Number(String(mapCol(r,['intereses','interes','interest'])||0).replace(/[^0-9.-]/g,'')),
+            cargos: Number(String(mapCol(r,['cargos','cargo','charges'])||0).replace(/[^0-9.-]/g,'')),
+            abonos: Number(String(mapCol(r,['abonos','abono'])||0).replace(/[^0-9.-]/g,'')),
+            totalCobrado: Number(String(mapCol(r,['totalCobrado','totalcobrado','total cobrado','cobrado'])||0).replace(/[^0-9.-]/g,'')),
+            saldoFavor: Number(String(mapCol(r,['saldoFavor','saldofavor','saldo favor','saldo'])||0).replace(/[^0-9.-]/g,''))
+          };
+        }).filter(r => r && r.unidad);
+
+        if (!window._importGCRows.length) { status.innerHTML = '⚠️ No se encontraron filas válidas.'; return; }
+        
+        status.innerHTML = `✅ <strong>${window._importGCRows.length} unidades</strong> listas para importar.`;
+        document.getElementById('btn-imp-gc').style.display = 'inline-block';
+
+        // Preview
+        const cols = Object.keys(window._importGCRows[0]);
+        let html = `<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1d4ed8;color:white">`;
+        cols.forEach(c => html += `<th style="padding:5px">${c}</th>`);
+        html += '</tr></thead><tbody>';
+        window._importGCRows.slice(0,5).forEach(r => {
+          html += '<tr style="border-bottom:1px solid #eee">';
+          cols.forEach(c => html += `<td style="padding:4px 5px;text-align:right">${typeof r[c]==='number'&&r[c]>0?'$'+r[c].toLocaleString('es-CL'):r[c]||''}</td>`);
+          html += '</tr>';
+        });
+        if (window._importGCRows.length > 5) html += `<tr><td colspan="${cols.length}" style="padding:6px;text-align:center;color:#666">...y ${window._importGCRows.length-5} filas más</td></tr>`;
+        html += '</tbody></table>';
+        preview.innerHTML = html;
+      } catch(err) { status.innerHTML = '❌ Error: ' + err.message; }
+    };
+    if (file.name.endsWith('.csv')) reader.readAsText(file, 'UTF-8');
+    else reader.readAsArrayBuffer(file);
+  });
+}
+
+async function ejecutarImportGastos() {
+  if (!window._importGCRows || !window._importGCRows.length) return;
+  const btn = document.getElementById('btn-imp-gc');
+  const status = document.getElementById('imp-gc-status');
+  btn.disabled = true;
+  status.innerHTML = '⏳ Importando...';
+
+  try {
+    // Borrar datos anteriores
+    const oldSnap = await db.collection('gastos_comunes_planilla').get();
+    for (const d of oldSnap.docs) await d.ref.delete();
+
+    // Importar nuevos
+    let ok = 0;
+    for (const r of window._importGCRows) {
+      await db.collection('gastos_comunes_planilla').add(r);
+      ok++;
+    }
+    status.innerHTML = `✅ ${ok} unidades importadas correctamente.`;
+    setTimeout(() => {
+      document.querySelector('div[style*="position:fixed"][style*="z-index:300"]')?.remove();
+      renderGastosTabla();
+    }, 1500);
+  } catch(e) {
+    status.innerHTML = '❌ Error: ' + e.message;
+    btn.disabled = false;
+  }
 }
 
 function exportarGastosExcel() {
