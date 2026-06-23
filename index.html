@@ -411,11 +411,23 @@ function guardarResidente() {
 function mostrarRecaudacion() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-verde" onclick="abrirImportarExcelRecaudacion()">📥 Importar Excel</button>
-      <button class="btn btn-verde" onclick="abrirModalPago()">+ Registrar pago / ajuste</button>
-      <button class="btn btn-verde" style="background:#dc2626" onclick="abrirEliminarLote()">🗑️ Eliminar por lote</button>
-      <button class="btn btn-verde" style="background:#1d4ed8" onclick="mostrarEstadoCuenta()">📊 Estado de cuenta por unidad</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+      <input id="filtro-unidad-pago" type="number" placeholder="Filtrar unidad…" onchange="cargarPagos()" style="padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px;width:130px">
+      <select id="filtro-vista-pago" onchange="cargarPagos()" style="padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <option value="todos">Todos los pagos</option>
+        <option value="agrupado">Agrupar por unidad</option>
+        <option value="ultimo">Solo último pago por unidad</option>
+      </select>
+      <select id="filtro-antiguos-pago" onchange="cargarPagos()" style="padding:9px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <option value="recientes">Más recientes primero</option>
+        <option value="antiguos">Más antiguos primero</option>
+      </select>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-verde" onclick="abrirImportarExcelRecaudacion()">📥 Importar Excel</button>
+        <button class="btn btn-verde" onclick="abrirModalPago()">+ Registrar pago</button>
+        <button class="btn btn-verde" style="background:#dc2626" onclick="abrirEliminarLote()">🗑️ Eliminar lote</button>
+        <button class="btn btn-verde" style="background:#1d4ed8" onclick="mostrarEstadoCuenta()">📊 Estado de cuenta</button>
+      </div>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Pagos y movimientos</h3></div>
@@ -559,22 +571,84 @@ function imprimirEstadoCuenta() {
 }
 
 function cargarPagos() {
-  db.collection('pagos').orderBy('fecha','desc').get().then(snap => {
+  const filtroUnidad = (document.getElementById('filtro-unidad-pago')||{}).value||'';
+  const filtroVista = (document.getElementById('filtro-vista-pago')||{}).value||'todos';
+  const filtroAntiguos = (document.getElementById('filtro-antiguos-pago')||{}).value||'recientes';
+
+  db.collection('pagos').orderBy('fecha','asc').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay pagos registrados</div>'; return; }
+
+    let todos = [];
+    snap.forEach(d => { todos.push({...d.data(), _id: d.id}); });
+
+    // Ordenar por fecha asc (ya viene así) o desc según filtro
+    if (filtroAntiguos === 'antiguos') {
+      todos.sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
+    } else {
+      todos.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+    }
+
+    // Filtrar por unidad
+    if (filtroUnidad) todos = todos.filter(p => String(p.unidad||'') === filtroUnidad);
+
+    // Agrupar por unidad y solo mostrar el más reciente
+    if (filtroVista === 'ultimo') {
+      const porUnidad = {};
+      // Recorrer en orden cronológico para quedarnos con el más nuevo
+      [...todos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).forEach(p => {
+        const u = p.unidad||'sin-unidad';
+        if (!porUnidad[u]) porUnidad[u] = p;
+      });
+      todos = Object.values(porUnidad).sort((a,b) => parseInt(a.unidad||0)-parseInt(b.unidad||0));
+    }
+
+    // Agrupar por unidad para mostrar separadas
+    if (filtroVista === 'agrupado' || filtroVista === 'ultimo') {
+      const grupos = {};
+      todos.forEach(p => {
+        const u = p.unidad||'sin-unidad';
+        if (!grupos[u]) grupos[u] = [];
+        grupos[u].push(p);
+      });
+      const unidadesOrdenadas = Object.keys(grupos).sort((a,b) => parseInt(a)-parseInt(b));
+      let html = '';
+      unidadesOrdenadas.forEach(u => {
+        html += `<div style="margin-bottom:16px">
+          <div style="background:#1a7a4a;color:white;padding:8px 16px;border-radius:8px 8px 0 0;font-weight:700;font-size:13px">🏠 Unidad ${u}</div>
+          <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:#e8f5ee"><th style="padding:9px 12px;text-align:left;font-size:12px">Fecha</th><th style="padding:9px 12px;text-align:left;font-size:12px">Concepto</th><th style="padding:9px 12px;text-align:right;font-size:12px">Monto</th><th style="padding:9px 12px;text-align:left;font-size:12px">Forma</th><th style="padding:9px 12px;font-size:12px">Acciones</th></tr></thead><tbody>`;
+        grupos[u].forEach(p => {
+          html += `<tr style="border-bottom:1px solid var(--borde)">
+            <td style="padding:9px 12px;font-size:13px">${p.fecha||'—'}</td>
+            <td style="padding:9px 12px;font-size:13px">${p.concepto||'—'}</td>
+            <td style="padding:9px 12px;font-size:13px;text-align:right">$${Number(p.monto||0).toLocaleString('es-CL')}</td>
+            <td style="padding:9px 12px;font-size:13px"><span class="badge badge-gris">${p.forma||'—'}</span></td>
+            <td style="padding:9px 12px;white-space:nowrap">
+              <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick='abrirEditarPago(${JSON.stringify({id:p._id,...p}).replace(/'/g,"&#39;")})'>✏️</button>
+              <button class="btn btn-sm" style="background:#dc2626;color:white;margin-right:4px" onclick="eliminarPago('${p._id}','${p.unidad||''}','${p.fecha||''}')">🗑️</button>
+              <button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick="verTransaccionesUnidad('${u}')">📋</button>
+            </td>
+          </tr>`;
+        });
+        html += '</tbody></table></div>';
+      });
+      document.getElementById('lista-pagos').innerHTML = html || '<div style="padding:24px;text-align:center;color:#999">Sin resultados</div>';
+      return;
+    }
+
+    // Vista plana (por defecto)
     let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th><th style="text-align:center">Acciones</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const p = d.data();
-      const id = d.id;
-      const dataStr = encodeURIComponent(JSON.stringify({id, ...p}));
+    todos.forEach(p => {
       html += `<tr>
         <td>${p.fecha||'—'}</td>
-        <td>${p.unidad||'—'}</td>
+        <td><strong>${p.unidad||'—'}</strong></td>
         <td>${p.concepto||'—'}</td>
         <td>$${Number(p.monto||0).toLocaleString('es-CL')}</td>
         <td><span class="badge badge-gris">${p.forma||'—'}</span></td>
         <td style="text-align:center;white-space:nowrap">
-          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick='abrirEditarPago(${JSON.stringify({id,...p})})'>✏️ Editar</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarPago('${id}','${p.unidad||''}','${p.fecha||''}')">🗑️</button>
+          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick='abrirEditarPago(${JSON.stringify({id:p._id,...p}).replace(/'/g,"&#39;")})'>✏️</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:white;margin-right:4px" onclick="eliminarPago('${p._id}','${p.unidad||''}','${p.fecha||''}')">🗑️</button>
+          <button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick="verTransaccionesUnidad('${p.unidad||''}')">📋</button>
         </td>
       </tr>`;
     });
@@ -583,9 +657,142 @@ function cargarPagos() {
   }).catch(() => { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Sin pagos registrados aún</div>'; });
 }
 
-function eliminarPago(id, unidad, fecha) {
-  if (!confirm(`¿Eliminar el pago de unidad ${unidad} del ${fecha}?\nEsta acción no se puede deshacer.`)) return;
-  db.collection('pagos').doc(id).delete().then(() => { cargarPagos(); }).catch(e => alert('Error al eliminar: ' + e.message));
+// ===== MÓDULO TRANSACCIONES POR UNIDAD =====
+function verTransaccionesUnidad(unidad) {
+  if (!unidad) { alert('Unidad no especificada'); return; }
+  const existente = document.getElementById('modal-transacciones');
+  if (existente) existente.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-transacciones';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;width:900px;max-width:97vw;max-height:92vh;overflow-y:auto">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center;background:#1a7a4a;border-radius:16px 16px 0 0">
+        <span style="font-weight:700;font-size:15px;color:white">📋 Historial de transacciones — Unidad ${unidad}</span>
+        <div style="display:flex;gap:8px">
+          <button onclick="imprimirTransacciones('${unidad}')" style="background:white;color:#1a7a4a;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🖨️ Imprimir</button>
+          <button onclick="document.getElementById('modal-transacciones').remove()" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px">✖ Cerrar</button>
+        </div>
+      </div>
+      <div style="padding:16px 20px" id="contenido-transacciones">
+        <div style="text-align:center;padding:24px;color:#999">Cargando transacciones...</div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  cargarTransaccionesUnidad(unidad);
+}
+
+async function cargarTransaccionesUnidad(unidad) {
+  const div = document.getElementById('contenido-transacciones');
+  try {
+    const [rSnap, pagosSnap, gcSnap] = await Promise.all([
+      db.collection('residentes').where('unidad','==',String(unidad)).get(),
+      db.collection('pagos').where('unidad','==',String(unidad)).orderBy('fecha','asc').get(),
+      db.collection('gastos_comunes').where('unidad','==',String(unidad)).orderBy('vencimiento','asc').get()
+    ]);
+    const residente = rSnap.empty ? {nombre:'—', deuda:0, intereses:0} : rSnap.docs[0].data();
+
+    // Combinar movimientos
+    let movs = [];
+    // Cargos: gastos comunes emitidos
+    gcSnap.forEach(d => {
+      const g = d.data();
+      movs.push({fecha: g.vencimiento||g.fechaEmision||'', tipo:'cargo', descripcion:`Gasto común ${g.mes||''}`, cargo:Number(g.monto||0), abono:0});
+    });
+    // También agregar GC del mes desde la tabla estática si no hay datos en Firestore
+    if (gcSnap.empty) {
+      const gcData = GASTOS_JULIO_2026.find(g => String(g.unidad)===String(unidad));
+      if (gcData) {
+        movs.push({fecha:'2026-07-01', tipo:'cargo', descripcion:`Gasto común julio 2026 (GC egresos)`, cargo:gcData.totalMes, abono:0});
+        if (gcData.capitalAtrasado > 0) movs.push({fecha:'2026-07-01', tipo:'cargo', descripcion:`Capital atrasado`, cargo:gcData.capitalAtrasado, abono:0});
+        if (gcData.intereses > 0) movs.push({fecha:'2026-07-01', tipo:'cargo', descripcion:`Intereses por mora`, cargo:gcData.intereses, abono:0});
+      }
+    }
+    // Abonos: pagos registrados
+    pagosSnap.forEach(d => {
+      const p = d.data();
+      const esAjuste = p.tipo === 'Ajuste';
+      movs.push({fecha:p.fecha||'', tipo:esAjuste?'ajuste':'abono', descripcion:p.concepto||'Pago', cargo:0, abono:Number(p.monto||0), esAjuste, forma:p.forma||''});
+    });
+
+    // Ordenar por fecha asc
+    movs.sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
+
+    let saldo = (residente.deuda||0) + (residente.intereses||0);
+    // Recalcular saldo desde cero con los movimientos
+    let saldoAcum = 0;
+    // Determinar saldo inicial
+    const deudaTotal = (residente.deuda||0)+(residente.intereses||0);
+
+    let html = `
+      <div style="margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div><strong>Residente:</strong> ${residente.nombre||'—'}</div>
+        <div><strong>Unidad:</strong> ${unidad}</div>
+        <div><strong>Deuda registrada:</strong> <span style="color:#dc2626;font-weight:700">$${deudaTotal.toLocaleString('es-CL')}</span></div>
+      </div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#1a7a4a;color:white">
+          <th style="padding:10px 12px;text-align:left">Fecha</th>
+          <th style="padding:10px 12px;text-align:left">Descripción</th>
+          <th style="padding:10px 12px;text-align:right">Cargo</th>
+          <th style="padding:10px 12px;text-align:right">Abono</th>
+          <th style="padding:10px 12px;text-align:right">Saldo</th>
+        </tr></thead><tbody>`;
+
+    // Fila saldo inicial desde BD
+    html += `<tr style="background:#e8f5ee">
+      <td style="padding:9px 12px">—</td>
+      <td style="padding:9px 12px"><strong>Saldo según registro de residentes</strong></td>
+      <td style="padding:9px 12px;text-align:right"></td>
+      <td style="padding:9px 12px;text-align:right"></td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700">$${deudaTotal.toLocaleString('es-CL')}</td>
+    </tr>`;
+    saldoAcum = deudaTotal;
+
+    if (movs.length === 0) {
+      html += `<tr><td colspan="5" style="padding:20px;text-align:center;color:#999">Sin transacciones registradas para esta unidad</td></tr>`;
+    } else {
+      movs.forEach(m => {
+        const [y,mo,d] = (m.fecha||'').split('-');
+        const fechaFmt = m.fecha ? `${d||''}/${mo||''}/${y||''}` : '—';
+        if (!m.esAjuste) {
+          saldoAcum += m.cargo - m.abono;
+        }
+        const bgRow = m.esAjuste ? '#fef9c3' : m.tipo==='cargo' ? '#fff5f5' : '';
+        html += `<tr style="border-bottom:1px solid #eee;background:${bgRow}">
+          <td style="padding:9px 12px">${fechaFmt}</td>
+          <td style="padding:9px 12px">${m.descripcion}${m.esAjuste?' <span style="font-size:11px;color:#854d0e">(ajuste)</span>':''}${m.forma?' — '+m.forma:''}</td>
+          <td style="padding:9px 12px;text-align:right;color:#dc2626">${m.cargo>0?'$'+m.cargo.toLocaleString('es-CL'):''}</td>
+          <td style="padding:9px 12px;text-align:right;color:#16a34a">${m.abono>0?'$'+m.abono.toLocaleString('es-CL'):''}</td>
+          <td style="padding:9px 12px;text-align:right;font-weight:600">${m.esAjuste?'(ajuste)':'$'+saldoAcum.toLocaleString('es-CL')}</td>
+        </tr>`;
+      });
+    }
+    html += `</tbody><tfoot><tr style="background:#0f4a2c;color:white">
+      <td colspan="4" style="padding:10px 12px;font-weight:700">SALDO CALCULADO ACTUAL</td>
+      <td style="padding:10px 12px;text-align:right;font-weight:700">$${saldoAcum.toLocaleString('es-CL')}</td>
+    </tr></tfoot></table></div>`;
+    div.innerHTML = html;
+  } catch(e) {
+    div.innerHTML = `<div style="padding:24px;text-align:center;color:#dc2626">Error al cargar: ${e.message}</div>`;
+  }
+}
+
+function imprimirTransacciones(unidad) {
+  const contenido = document.getElementById('contenido-transacciones').innerHTML;
+  const v = window.open('','_blank');
+  v.document.write(`<!DOCTYPE html><html><head><title>Transacciones Unidad ${unidad}</title><style>
+    body{font-family:Arial,sans-serif;font-size:12px;padding:30px;max-width:800px;margin:0 auto}
+    table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd}th{background:#1a7a4a;color:white}
+    @media print{body{padding:20px}}
+  </style></head><body>
+    <h2 style="color:#1a7a4a">Historial de Transacciones — Unidad ${unidad}</h2>
+    <p style="color:#666">Condominio Las Araucarias · ${new Date().toLocaleDateString('es-CL')}</p>
+    ${contenido}
+  </body></html>`);
+  v.document.close();
+  setTimeout(()=>v.print(),500);
 }
 
 function abrirEditarPago(p) {
@@ -723,7 +930,7 @@ async function confirmarEliminarLote() {
 
 function abrirModalPago() { document.getElementById('modal-pago').style.display = 'flex'; document.getElementById('p-fecha').value=new Date().toISOString().split('T')[0]; }
 function cerrarModalPago() { document.getElementById('modal-pago').style.display = 'none'; }
-function guardarPago() {
+async function guardarPago() {
   const tipo = document.getElementById('p-tipo').value;
   const datos = {
     unidad: document.getElementById('p-unidad').value,
@@ -732,9 +939,58 @@ function guardarPago() {
     monto: Number(document.getElementById('p-monto').value),
     fecha: document.getElementById('p-fecha').value,
     forma: document.getElementById('p-forma').value,
+    fechaRegistro: new Date().toISOString()
   };
   if (!datos.unidad || !datos.monto) { alert('Ingresa al menos la unidad y el monto'); return; }
-  db.collection('pagos').add(datos).then(() => { cerrarModalPago(); cargarPagos(); }).catch(e => alert('Error: ' + e.message));
+
+  try {
+    // PUNTO 8: Si es Ajuste/Compensación, solo se descuenta de la unidad, NO suma a cuentas del condominio
+    const esAjuste = tipo === 'Ajuste';
+
+    // Guardar en colección pagos
+    const ref = await db.collection('pagos').add(datos);
+
+    // Descontar deuda del residente al registrar pago (punto 7)
+    const rSnap = await db.collection('residentes').where('unidad','==',String(datos.unidad)).get();
+    if (!rSnap.empty) {
+      const rDoc = rSnap.docs[0];
+      const r = rDoc.data();
+      let nuevaDeuda = (r.deuda||0);
+      let nuevosIntereses = (r.intereses||0);
+      let montoRestante = datos.monto;
+      // Primero descontar intereses, luego capital
+      if (montoRestante >= nuevosIntereses) {
+        montoRestante -= nuevosIntereses;
+        nuevosIntereses = 0;
+      } else {
+        nuevosIntereses -= montoRestante;
+        montoRestante = 0;
+      }
+      nuevaDeuda = Math.max(0, nuevaDeuda - montoRestante);
+      await rDoc.ref.update({ deuda: nuevaDeuda, intereses: nuevosIntereses });
+    }
+
+    // Auto-registro en libro diario (solo si NO es ajuste, punto 8)
+    if (!esAjuste) {
+      await db.collection('libro_diario').add({
+        fecha: datos.fecha,
+        glosa: `Pago GC unidad ${datos.unidad} - ${datos.concepto||''}`,
+        cuentaDebe: datos.forma==='Efectivo'?'Caja chica':'Banco Estado',
+        montoDebe: datos.monto,
+        cuentaHaber: 'Ingresos gastos comunes',
+        montoHaber: datos.monto,
+        documento: '',
+        origen: 'pago_automatico',
+        referenciaId: ref.id
+      });
+    }
+    // Si es ajuste: solo se registra en pagos y se descuenta de la unidad (hecho arriba)
+    // NO se registra en libro diario ni suma a cuentas del condominio
+
+    cerrarModalPago();
+    cargarPagos();
+    alert(`✅ ${esAjuste?'Ajuste':'Pago'} registrado correctamente.${!esAjuste?' Asiento contable generado automáticamente.':' (Solo descuento en unidad, no afecta cuentas del condominio)'}`);
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 // ===================== GASTOS COMUNES =====================
@@ -980,10 +1236,24 @@ function cargarEgresos() {
     document.getElementById('egresos-rrhh').textContent = '$'+rrhh.toLocaleString('es-CL');
 
     if (snap.empty) { document.getElementById('lista-egresos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay egresos registrados</div>'; return; }
-    let html = '<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Forma pago</th><th>Doc.</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Forma pago</th><th>Doc.</th><th>Acciones</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const e = d.data();
-      html += `<tr><td>${e.fecha||'—'}</td><td><span class="badge badge-gris">${e.categoria||'—'}</span></td><td>${e.descripcion||'—'}</td><td>${e.proveedor||'—'}</td><td>$${Number(e.monto||0).toLocaleString('es-CL')}</td><td>${e.forma||'—'}</td><td>${e.documento||'—'}</td></tr>`;
+      const e = d.data(); const id = d.id;
+      const datosStr = JSON.stringify({...e}).replace(/'/g,"&#39;");
+      html += `<tr>
+        <td>${e.fecha||'—'}</td>
+        <td><span class="badge badge-gris">${e.categoria||'—'}</span></td>
+        <td>${e.descripcion||'—'}</td>
+        <td>${e.proveedor||'—'}</td>
+        <td style="text-align:right">$${Number(e.monto||0).toLocaleString('es-CL')}</td>
+        <td>${e.forma||'—'}</td>
+        <td>${e.documento||'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:3px" onclick='abrirEditarEgreso("${id}",${datosStr})'>✏️</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:white;margin-right:3px" onclick="eliminarEgreso('${id}')">🗑️</button>
+          <button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick='descargarComprobanteEgreso(${datosStr})'>📄</button>
+        </td>
+      </tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('lista-egresos').innerHTML = html;
@@ -1260,7 +1530,7 @@ function descargarWordCarta(){
 
 function abrirModalEgreso() { document.getElementById('modal-egreso').style.display='flex'; document.getElementById('e-fecha').value=new Date().toISOString().split('T')[0]; }
 function cerrarModalEgreso() { document.getElementById('modal-egreso').style.display='none'; }
-function guardarEgreso() {
+async function guardarEgreso() {
   const datos = {
     fecha: document.getElementById('e-fecha').value,
     categoria: document.getElementById('e-categoria').value,
@@ -1269,9 +1539,116 @@ function guardarEgreso() {
     monto: Number(document.getElementById('e-monto').value),
     forma: document.getElementById('e-forma').value,
     documento: document.getElementById('e-documento').value,
+    fechaRegistro: new Date().toISOString()
   };
   if (!datos.descripcion || !datos.monto) { alert('Ingresa al menos la descripción y el monto'); return; }
-  db.collection('egresos').add(datos).then(() => { cerrarModalEgreso(); cargarEgresos(); }).catch(e => alert('Error: '+e.message));
+  try {
+    const ref = await db.collection('egresos').add(datos);
+    // Auto-registrar en libro diario
+    await db.collection('libro_diario').add({
+      fecha: datos.fecha,
+      glosa: `Egreso: ${datos.descripcion} — ${datos.categoria||''}`,
+      cuentaDebe: datos.categoria||'Gastos generales',
+      montoDebe: datos.monto,
+      cuentaHaber: datos.forma==='Efectivo'?'Caja chica':'Banco',
+      montoHaber: datos.monto,
+      documento: datos.documento||'',
+      origen: 'egreso_automatico',
+      referenciaId: ref.id
+    });
+    cerrarModalEgreso();
+    cargarEgresos();
+    // Ofrecer descarga de comprobante
+    if (confirm('✅ Egreso registrado y asiento contable generado.\n\n¿Descargar comprobante en PDF?')) {
+      descargarComprobanteEgreso(datos);
+    }
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+function descargarComprobanteEgreso(datos) {
+  const [y,m,d] = (datos.fecha||'').split('-');
+  const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const html = `<!DOCTYPE html><html><head><title>Comprobante Egreso</title>
+  <style>body{font-family:Arial,sans-serif;font-size:13px;padding:50px;max-width:700px;margin:0 auto;line-height:1.8}
+  table{width:100%;border-collapse:collapse}td{padding:10px;border:1px solid #ccc}
+  .titulo{font-weight:700;font-size:15px;text-align:center;letter-spacing:1px;margin-bottom:24px;text-decoration:underline}
+  @media print{body{padding:30px}}</style>
+  <script>window.onload=function(){window.print();}<\/script>
+  </head><body>
+  <div style="text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #0f4a2c">
+    <div style="font-size:15px;font-weight:700;color:#0f4a2c">CONDOMINIO LAS ARAUCARIAS</div>
+    <div style="font-size:11px;color:#555">Sargento Aldea 67, La Cruz, Quillota · RUT: 53.321.396-0</div>
+  </div>
+  <p style="text-align:right">La Cruz, ${parseInt(d||0)} de ${meses[parseInt(m||1)]} del ${y}.-</p>
+  <p class="titulo">COMPROBANTE DE EGRESO</p>
+  <table>
+    <tr style="background:#e8f5ee"><td><strong>Fecha</strong></td><td>${datos.fecha||'—'}</td></tr>
+    <tr><td><strong>Categoría</strong></td><td>${datos.categoria||'—'}</td></tr>
+    <tr style="background:#e8f5ee"><td><strong>Descripción</strong></td><td>${datos.descripcion||'—'}</td></tr>
+    <tr><td><strong>Proveedor</strong></td><td>${datos.proveedor||'—'}</td></tr>
+    <tr style="background:#e8f5ee"><td><strong>Forma de pago</strong></td><td>${datos.forma||'—'}</td></tr>
+    <tr><td><strong>N° Documento</strong></td><td>${datos.documento||'—'}</td></tr>
+    <tr style="background:#0f4a2c;color:white"><td><strong>MONTO TOTAL</strong></td><td><strong>$${Number(datos.monto||0).toLocaleString('es-CL')}</strong></td></tr>
+  </table>
+  <br>
+  <p>Asiento contable automático registrado:</p>
+  <table><tr style="background:#d6eaf8"><th>Cuenta</th><th>Debe</th><th>Haber</th></tr>
+    <tr><td>${datos.categoria||'Gastos generales'}</td><td style="text-align:right">$${Number(datos.monto||0).toLocaleString('es-CL')}</td><td></td></tr>
+    <tr><td>${datos.forma==='Efectivo'?'Caja chica':'Banco'}</td><td></td><td style="text-align:right">$${Number(datos.monto||0).toLocaleString('es-CL')}</td></tr>
+  </table>
+  <div style="margin-top:60px;display:flex;justify-content:space-between">
+    <div style="text-align:center"><p>_______________________</p><p style="font-size:12px">Administración</p></div>
+    <div style="text-align:center"><p>_______________________</p><p style="font-size:12px">Recibe conforme</p></div>
+  </div>
+  </body></html>`;
+  const v = window.open('','_blank');
+  v.document.write(html);
+  v.document.close();
+}
+
+function abrirEditarEgreso(id, datos) {
+  const existente = document.getElementById('modal-editar-egreso');
+  if(existente) existente.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-editar-egreso';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:92vw">
+      <h3 style="margin-bottom:20px;color:var(--verde4)">✏️ Editar egreso</h3>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <input id="ee-fecha" type="date" value="${datos.fecha||''}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <select id="ee-categoria" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          ${['Mantención','Servicios básicos','RR.HH.','Administración','Seguros','Limpieza','Jardín','Otro'].map(c=>`<option ${c===datos.categoria?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <input id="ee-descripcion" value="${datos.descripcion||''}" placeholder="Descripción" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <input id="ee-proveedor" value="${datos.proveedor||''}" placeholder="Proveedor" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <input id="ee-monto" type="number" value="${datos.monto||0}" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        <select id="ee-forma" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          ${['Transferencia','Efectivo','Cheque','Débito'].map(f=>`<option ${f===datos.forma?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <input id="ee-documento" value="${datos.documento||''}" placeholder="N° Documento" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-editar-egreso').remove()">Cancelar</button>
+        <button class="btn btn-verde" onclick="guardarEdicionEgreso('${id}')">💾 Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function guardarEdicionEgreso(id) {
+  const datos = {
+    fecha: document.getElementById('ee-fecha').value,
+    categoria: document.getElementById('ee-categoria').value,
+    descripcion: document.getElementById('ee-descripcion').value,
+    proveedor: document.getElementById('ee-proveedor').value,
+    monto: Number(document.getElementById('ee-monto').value),
+    forma: document.getElementById('ee-forma').value,
+    documento: document.getElementById('ee-documento').value
+  };
+  db.collection('egresos').doc(id).update(datos)
+    .then(()=>{ document.getElementById('modal-editar-egreso').remove(); cargarEgresos(); })
+    .catch(e=>alert('Error: '+e.message));
 }
 
 function abrirModalGasto() { document.getElementById('modal-gasto').style.display = 'flex'; }
@@ -1350,10 +1727,6 @@ function editarAsiento(id, datos) {
   document.getElementById('a-monto-haber').value=datos.montoHaber||'';
   document.getElementById('a-documento').value=datos.documento||'';
   document.getElementById('modal-asiento').style.display='flex';
-}
-function eliminarAsiento(id) {
-  if(!confirm('¿Eliminar este asiento contable?')) return;
-  db.collection('libro_diario').doc(id).delete().then(()=>cargarAsientos()).catch(e=>alert('Error: '+e.message));
 }
 function guardarAsiento() {
   const datos = {
@@ -2235,54 +2608,6 @@ function guardarVisita(){
 }
 
 // ===================== TRABAJADORES =====================
-function mostrarTrabajadores() {
-  const c = document.getElementById('content');
-  c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-verde" onclick="abrirModalTrabajador()">+ Agregar trabajador</button>
-    </div>
-    <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Trabajadores</h3></div>
-      <div id="lista-trabajadores"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
-    </div>
-    <div id="modal-trabajador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
-      <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 style="margin-bottom:20px;color:var(--verde4)">Agregar trabajador</h3>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <input id="tr-nombre" placeholder="Nombre completo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-rut" placeholder="RUT" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <select id="tr-cargo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-            <option>Conserje</option><option>Portero</option><option>Jardinero</option><option>Aseo</option><option>Administrador</option><option>Otro</option>
-          </select>
-          <input id="tr-telefono" placeholder="Teléfono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-correo" placeholder="Correo electrónico" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-ingreso" type="date" placeholder="Fecha de ingreso" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <input id="tr-sueldo" placeholder="Sueldo bruto ($)" type="number" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        </div>
-        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-          <button class="btn btn-outline" onclick="cerrarModalTrabajador()">Cancelar</button>
-          <button class="btn btn-verde" onclick="guardarTrabajador()">Guardar</button>
-        </div>
-      </div>
-    </div>`;
-  db.collection('trabajadores').get().then(snap => {
-    if (snap.empty) { document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores registrados</div>'; return; }
-    let html='<table><thead><tr><th>Nombre</th><th>RUT</th><th>Cargo</th><th>Teléfono</th><th>Correo</th><th>Ingreso</th><th>Sueldo bruto</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const tr=d.data();
-      html+=`<tr><td>${tr.nombre||'—'}</td><td>${tr.rut||'—'}</td><td><span class="badge badge-gris">${tr.cargo||'—'}</span></td><td>${tr.telefono||'—'}</td><td>${tr.correo||'—'}</td><td>${tr.ingreso||'—'}</td><td>$${Number(tr.sueldo||0).toLocaleString('es-CL')}</td></tr>`;
-    });
-    html+='</tbody></table>';
-    document.getElementById('lista-trabajadores').innerHTML=html;
-  }).catch(()=>{ document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores aún</div>'; });
-}
-function abrirModalTrabajador(){document.getElementById('modal-trabajador').style.display='flex';}
-function cerrarModalTrabajador(){document.getElementById('modal-trabajador').style.display='none';}
-function guardarTrabajador(){
-  const datos={nombre:document.getElementById('tr-nombre').value,rut:document.getElementById('tr-rut').value,cargo:document.getElementById('tr-cargo').value,telefono:document.getElementById('tr-telefono').value,correo:document.getElementById('tr-correo').value,ingreso:document.getElementById('tr-ingreso').value,sueldo:Number(document.getElementById('tr-sueldo').value)||0};
-  if(!datos.nombre){alert('Ingresa el nombre');return;}
-  db.collection('trabajadores').add(datos).then(()=>{cerrarModalTrabajador();mostrarTrabajadores();}).catch(e=>alert('Error: '+e.message));
-}
 
 // ===================== PUBLICACIONES =====================
 function mostrarPublicaciones() {
@@ -2705,8 +3030,8 @@ function eliminarEgreso(id){
 
 // ===== LIBRO DIARIO: eliminar =====
 function eliminarAsiento(id){
-  if(!confirm('¿Eliminar este asiento?')) return;
-  db.collection('libroDiario').doc(id).delete().then(()=>cargarLibroDiario()).catch(e=>alert('Error: '+e.message));
+  if(!confirm('¿Eliminar este asiento contable? Esta acción no se puede deshacer.')) return;
+  db.collection('libro_diario').doc(id).delete().then(()=>cargarAsientos()).catch(e=>alert('Error al eliminar: '+e.message));
 }
 
 // ===== PUBLICACIONES: eliminar =====
@@ -3693,22 +4018,209 @@ function mostrarBalance() {
   const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const anioActual = new Date().getFullYear();
   c.innerHTML = `
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
       <select id="bal-anio" onchange="cargarBalance()" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-        ${[anioActual-1,anioActual,anioActual+1].map(y=>`<option value="${y}" ${y===anioActual?'selected':''}>${y}</option>`).join('')}
+        ${[anioActual-2,anioActual-1,anioActual,anioActual+1].map(y=>`<option value="${y}" ${y===anioActual?'selected':''}>${y}</option>`).join('')}
       </select>
       <button class="btn btn-verde" onclick="exportarBalanceExcel()">📊 Exportar Excel</button>
+      <button class="btn btn-verde" style="background:#1d4ed8" onclick="abrirImportarBalanceExcel()">📥 Importar meses históricos</button>
+      <button class="btn btn-verde" style="background:#7b2d8b" onclick="abrirRegistrarSaldoMes()">💾 Registrar saldo del mes</button>
     </div>
     <div class="cards-grid" style="margin-bottom:20px">
       <div class="card"><div class="card-icon">💰</div><div class="card-valor" id="bal-total-ing">—</div><div class="card-label">Total ingresos año</div></div>
       <div class="card"><div class="card-icon">📤</div><div class="card-valor" id="bal-total-egr">—</div><div class="card-label">Total egresos año</div></div>
       <div class="card" id="bal-card-result"><div class="card-icon">📈</div><div class="card-valor" id="bal-resultado">—</div><div class="card-label">Resultado neto año</div></div>
     </div>
+    <div class="tabla-wrap" style="margin-bottom:20px">
+      <div class="tabla-header" style="display:flex;justify-content:space-between;align-items:center"><h3>Saldos históricos registrados</h3></div>
+      <div id="bal-historicos">Cargando...</div>
+    </div>
     <div class="tabla-wrap">
-      <div class="tabla-header"><h3>Resumen mensual</h3></div>
+      <div class="tabla-header"><h3>Resumen mensual calculado</h3></div>
       <div id="bal-tabla">Cargando...</div>
     </div>`;
   cargarBalance();
+  cargarSaldosHistoricos();
+}
+
+function abrirRegistrarSaldoMes() {
+  const m = document.createElement('div');
+  m.id = 'modal-saldo-mes';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const anio = new Date().getFullYear();
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:460px;max-width:95vw">
+      <h3 style="margin-bottom:20px;color:#7b2d8b">💾 Registrar saldo del mes</h3>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Mes</label>
+            <select id="sm-mes" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+              ${meses.map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Año</label>
+            <select id="sm-anio" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+              ${[anio-2,anio-1,anio,anio+1].map(y=>`<option value="${y}" ${y===anio?'selected':''}>${y}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Ingresos del mes ($)</label>
+          <input id="sm-ingresos" type="number" placeholder="0" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Egresos del mes ($)</label>
+          <input id="sm-egresos" type="number" placeholder="0" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Observación (opcional)</label>
+          <input id="sm-obs" placeholder="Ej: Datos de planilla anterior" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-saldo-mes').remove()">Cancelar</button>
+        <button class="btn btn-verde" style="background:#7b2d8b" onclick="guardarSaldoMes()">💾 Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  // Seleccionar mes actual
+  const mesActual = new Date().getMonth();
+  document.getElementById('sm-mes').value = mesActual + 1;
+}
+
+async function guardarSaldoMes() {
+  const mes = parseInt(document.getElementById('sm-mes').value);
+  const anio = parseInt(document.getElementById('sm-anio').value);
+  const ingresos = Number(document.getElementById('sm-ingresos').value)||0;
+  const egresos = Number(document.getElementById('sm-egresos').value)||0;
+  const obs = document.getElementById('sm-obs').value;
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  try {
+    await db.collection('balance_historico').doc(`${anio}-${String(mes).padStart(2,'0')}`).set({
+      mes, anio, ingresos, egresos, observacion: obs,
+      fechaRegistro: new Date().toISOString(), manual: true
+    });
+    document.getElementById('modal-saldo-mes').remove();
+    alert(`✅ Saldo de ${meses[mes]} ${anio} registrado correctamente.`);
+    cargarSaldosHistoricos();
+    cargarBalance();
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+async function cargarSaldosHistoricos() {
+  const div = document.getElementById('bal-historicos');
+  if (!div) return;
+  try {
+    const snap = await db.collection('balance_historico').orderBy('anio','desc').get();
+    if (snap.empty) { div.innerHTML = '<div style="padding:16px;text-align:center;color:#999;font-size:13px">Sin saldos históricos registrados manualmente</div>'; return; }
+    const mesesNom = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    let html = '<table><thead><tr><th>Periodo</th><th>Ingresos</th><th>Egresos</th><th>Resultado</th><th>Observación</th><th>Acciones</th></tr></thead><tbody>';
+    snap.forEach(d => {
+      const h = d.data(); const res = (h.ingresos||0)-(h.egresos||0);
+      html += `<tr>
+        <td><strong>${mesesNom[h.mes]||'—'} ${h.anio||'—'}</strong></td>
+        <td style="color:var(--verde)">$${Number(h.ingresos||0).toLocaleString('es-CL')}</td>
+        <td style="color:#dc2626">$${Number(h.egresos||0).toLocaleString('es-CL')}</td>
+        <td style="font-weight:700;color:${res>=0?'var(--verde)':'#dc2626'}">$${res.toLocaleString('es-CL')}</td>
+        <td style="font-size:12px;color:#666">${h.observacion||'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:4px" onclick="editarSaldoHistorico('${d.id}',${JSON.stringify(h).replace(/'/g,'&#39;')})">✏️</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarSaldoHistorico('${d.id}','${mesesNom[h.mes]} ${h.anio}')">🗑️</button>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    div.innerHTML = html;
+  } catch(e) { div.innerHTML = `<div style="padding:16px;color:#dc2626">Error: ${e.message}</div>`; }
+}
+
+function editarSaldoHistorico(id, datos) {
+  abrirRegistrarSaldoMes();
+  setTimeout(() => {
+    document.getElementById('sm-mes').value = datos.mes;
+    document.getElementById('sm-anio').value = datos.anio;
+    document.getElementById('sm-ingresos').value = datos.ingresos||0;
+    document.getElementById('sm-egresos').value = datos.egresos||0;
+    document.getElementById('sm-obs').value = datos.observacion||'';
+    // Override guardar para actualizar en lugar de crear
+    const btn = document.querySelector('#modal-saldo-mes button.btn-verde');
+    if(btn) btn.onclick = async () => {
+      const mes = parseInt(document.getElementById('sm-mes').value);
+      const anio = parseInt(document.getElementById('sm-anio').value);
+      const ingresos = Number(document.getElementById('sm-ingresos').value)||0;
+      const egresos = Number(document.getElementById('sm-egresos').value)||0;
+      const obs = document.getElementById('sm-obs').value;
+      try {
+        await db.collection('balance_historico').doc(id).update({mes,anio,ingresos,egresos,observacion:obs,fechaActualizacion:new Date().toISOString()});
+        document.getElementById('modal-saldo-mes').remove();
+        alert('✅ Saldo actualizado.');
+        cargarSaldosHistoricos(); cargarBalance();
+      } catch(e) { alert('Error: '+e.message); }
+    };
+  }, 100);
+}
+
+async function eliminarSaldoHistorico(id, nombre) {
+  if (!confirm(`¿Eliminar el registro de ${nombre}?`)) return;
+  try {
+    await db.collection('balance_historico').doc(id).delete();
+    cargarSaldosHistoricos(); cargarBalance();
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+function abrirImportarBalanceExcel() {
+  const m = document.createElement('div');
+  m.id = 'modal-import-balance';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 style="margin-bottom:6px;color:#1d4ed8">📥 Importar meses históricos</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas requeridas: <strong>mes, anio (o año), ingresos, egresos</strong>. Acepta .xlsx y .csv.</p>
+      <input type="file" id="imp-bal-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
+      <div id="imp-bal-status" style="margin-bottom:12px;font-size:13px;min-height:20px"></div>
+      <div id="imp-bal-preview" style="max-height:260px;overflow-y:auto;margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-import-balance').remove()">Cancelar</button>
+        <button id="btn-imp-bal" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportBalance()">✅ Importar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  document.getElementById('imp-bal-file').addEventListener('change', e => {
+    const file = e.target.files[0]; if(!file) return;
+    const status = document.getElementById('imp-bal-status');
+    status.innerHTML = '⏳ Leyendo...';
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const wb = XLSX.read(data,{type:'array'});
+        let rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+        window._importBalRows = rows.filter(r => r.ingresos||r.egresos).map(r => ({
+          mes: parseInt(r.mes||r.Mes||1), anio: parseInt(r.anio||r.año||r.Anio||r.Año||2026),
+          ingresos: Number(String(r.ingresos||0).replace(/[^0-9]/g,'')),
+          egresos: Number(String(r.egresos||0).replace(/[^0-9]/g,'')),
+          observacion: String(r.observacion||r.obs||'')
+        })).filter(r=>r.mes>=1&&r.mes<=12&&r.anio>2000);
+        status.innerHTML = `✅ ${window._importBalRows.length} registros encontrados.`;
+        document.getElementById('btn-imp-bal').style.display='inline-block';
+      } catch(err) { status.innerHTML='❌ Error: '+err.message; }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function ejecutarImportBalance() {
+  if(!window._importBalRows||!window._importBalRows.length) return;
+  let ok=0;
+  for(const r of window._importBalRows){
+    try { await db.collection('balance_historico').doc(`${r.anio}-${String(r.mes).padStart(2,'0')}`).set({...r,manual:true,fechaRegistro:new Date().toISOString()}); ok++; } catch(e){}
+  }
+  alert(`✅ ${ok} meses importados.`);
+  document.getElementById('modal-import-balance').remove();
+  cargarSaldosHistoricos(); cargarBalance();
 }
 
 async function cargarBalance() {
@@ -3920,19 +4432,65 @@ async function confirmarCierre() {
   const obs = document.getElementById('cierre-obs').value.trim();
   const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  if (!confirm(`¿Confirmar cierre de ${meses[mes]} ${anio}?\n\nEste mes quedará bloqueado en el Balance. Los registros NO se eliminan.\n\nPuedes reabrir el mes si es necesario.`)) return;
+  if (!confirm(`¿Confirmar cierre de ${meses[mes]} ${anio}?\n\nEste mes quedará bloqueado en el Balance.\nAl confirmar, se sumará automáticamente el GC del mes a las unidades que no pagaron.\n\nLos registros NO se eliminan.`)) return;
 
   try {
+    // Guardar cierre
     await db.collection('cierres_mes').add({
-      mes, anio,
-      totalIngresos: ingresos,
-      totalEgresos: egresos,
+      mes, anio, totalIngresos: ingresos, totalEgresos: egresos,
       observacion: obs,
       usuario: auth.currentUser ? auth.currentUser.email : 'Admin',
       fechaCierre: new Date().toISOString()
     });
+
+    // PUNTO 7: Sumar GC del mes a residentes que NO pagaron en ese período
+    const prefix = `${anio}-${String(mes).padStart(2,'0')}`;
+    const [resSnap, pagosSnap] = await Promise.all([
+      db.collection('residentes').get(),
+      db.collection('pagos').where('tipo','!=','Ajuste').get()
+    ]);
+
+    // Unidades que SÍ pagaron en el mes
+    const pagaronEste = new Set();
+    pagosSnap.forEach(d => {
+      const p = d.data();
+      if (p.fecha && p.fecha.startsWith(prefix) && p.tipo !== 'Ajuste') pagaronEste.add(String(p.unidad||''));
+    });
+
+    // Sumar GC a los que NO pagaron
+    let actualizados = 0;
+    const batch = [];
+    resSnap.forEach(d => {
+      const r = d.data();
+      const u = String(r.unidad||'');
+      if (!pagaronEste.has(u)) {
+        // Determinar monto GC según tipo de unidad
+        const gcMes = (parseInt(u) > 100) ? 6000 : 22000;
+        batch.push(d.ref.update({ deuda: (r.deuda||0) + gcMes }));
+        actualizados++;
+      }
+    });
+    await Promise.all(batch);
+
+    // Asiento contable del cierre
+    await db.collection('libro_diario').add({
+      fecha: `${anio}-${String(mes).padStart(2,'0')}-30`,
+      glosa: `Cierre mes ${meses[mes]} ${anio} — ${actualizados} unidades con GC sumado automáticamente`,
+      cuentaDebe: 'Ingresos gastos comunes devengados',
+      montoDebe: ingresos,
+      cuentaHaber: 'Gastos pagados del mes',
+      montoHaber: egresos,
+      documento: `CIERRE-${anio}${String(mes).padStart(2,'0')}`,
+      origen: 'cierre_mes'
+    });
+
     btn.style.display = 'none';
-    document.getElementById('cierre-resumen').innerHTML = `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px;color:var(--verde4)">✅ Cierre de <strong>${meses[mes]} ${anio}</strong> registrado exitosamente.</div>`;
+    document.getElementById('cierre-resumen').innerHTML = `
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px;color:var(--verde4)">
+        ✅ Cierre de <strong>${meses[mes]} ${anio}</strong> registrado exitosamente.<br>
+        📋 GC del mes sumado automáticamente a <strong>${actualizados}</strong> unidades sin pago registrado.<br>
+        📒 Asiento de cierre generado en Libro Diario.
+      </div>`;
     cargarHistorialCierres();
   } catch(e) { alert('Error al registrar cierre: ' + e.message); }
 }
@@ -3945,6 +4503,161 @@ async function reabrirMes(id, nombreMes) {
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-</script>
+// ===================== PUNTO 9: PAGO DE SUELDOS — TRABAJADORES =====================
+function mostrarTrabajadores() {
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-verde" onclick="abrirModalTrabajador()">+ Agregar trabajador</button>
+    </div>
+    <div class="tabla-wrap">
+      <div class="tabla-header"><h3>Trabajadores</h3></div>
+      <div id="lista-trabajadores"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
+    </div>
+    <div class="tabla-wrap" style="margin-top:20px">
+      <div class="tabla-header"><h3>📋 Historial de pagos de sueldos</h3></div>
+      <div id="lista-sueldos-pagados"><div style="padding:16px;text-align:center;color:#999">Cargando...</div></div>
+    </div>
+    <div id="modal-trabajador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
+      <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
+        <h3 style="margin-bottom:20px;color:var(--verde4)">Agregar trabajador</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <input id="tr-nombre" placeholder="Nombre completo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-rut" placeholder="RUT" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <select id="tr-cargo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option>Conserje</option><option>Portero</option><option>Jardinero</option><option>Aseo</option><option>Administrador</option><option>Otro</option>
+          </select>
+          <input id="tr-telefono" placeholder="Teléfono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-correo" placeholder="Correo electrónico" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-ingreso" type="date" placeholder="Fecha de ingreso" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="tr-sueldo" placeholder="Sueldo bruto ($)" type="number" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="cerrarModalTrabajador()">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarTrabajador()">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+  db.collection('trabajadores').get().then(snap => {
+    if (snap.empty) { document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores registrados</div>'; return; }
+    let html='<table><thead><tr><th>Nombre</th><th>RUT</th><th>Cargo</th><th>Teléfono</th><th>Ingreso</th><th>Sueldo bruto</th><th>Acciones</th></tr></thead><tbody>';
+    snap.forEach(d => {
+      const tr=d.data();
+      html+=`<tr>
+        <td>${tr.nombre||'—'}</td><td>${tr.rut||'—'}</td>
+        <td><span class="badge badge-gris">${tr.cargo||'—'}</span></td>
+        <td>${tr.telefono||'—'}</td>
+        <td>${tr.ingreso||'—'}</td>
+        <td>$${Number(tr.sueldo||0).toLocaleString('es-CL')}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm btn-verde" onclick="abrirPagarSueldo('${d.id}','${(tr.nombre||'').replace(/'/g,'')}',${tr.sueldo||0})">💵 Pagar sueldo</button>
+        </td>
+      </tr>`;
+    });
+    html+='</tbody></table>';
+    document.getElementById('lista-trabajadores').innerHTML=html;
+  }).catch(()=>{ document.getElementById('lista-trabajadores').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin trabajadores aún</div>'; });
+
+  // Cargar historial de sueldos pagados
+  db.collection('egresos').where('categoria','==','RR.HH.').orderBy('fecha','desc').get().then(snap => {
+    if(snap.empty){ document.getElementById('lista-sueldos-pagados').innerHTML='<div style="padding:16px;text-align:center;color:#999">Sin pagos de sueldo registrados</div>'; return; }
+    let html='<table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Monto</th><th>Forma pago</th><th>Documento</th><th>Comprobante</th></tr></thead><tbody>';
+    snap.forEach(d=>{
+      const e=d.data();
+      const datosStr=JSON.stringify(e).replace(/'/g,'&#39;');
+      html+=`<tr><td>${e.fecha||'—'}</td><td>${e.descripcion||'—'}</td><td style="text-align:right">$${Number(e.monto||0).toLocaleString('es-CL')}</td><td>${e.forma||'—'}</td><td>${e.documento||'—'}</td>
+        <td><button class="btn btn-sm" style="background:#7b2d8b;color:white" onclick='descargarComprobanteEgreso(${datosStr})'>📄 PDF</button></td></tr>`;
+    });
+    html+='</tbody></table>';
+    document.getElementById('lista-sueldos-pagados').innerHTML=html;
+  }).catch(()=>{});
+}
+
+function abrirPagarSueldo(idTrabajador, nombre, sueldoBruto) {
+  const m = document.createElement('div');
+  m.id = 'modal-pagar-sueldo';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
+      <h3 style="margin-bottom:6px;color:var(--verde4)">💵 Pagar sueldo</h3>
+      <p style="font-size:13px;color:#666;margin-bottom:20px">Trabajador: <strong>${nombre}</strong></p>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Fecha de pago</label>
+          <input id="ps-fecha" type="date" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Monto a pagar ($)</label>
+          <input id="ps-monto" type="number" value="${sueldoBruto}" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Forma de pago</label>
+          <select id="ps-forma" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option>Transferencia</option><option>Efectivo</option><option>Cheque</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Liquidación / Documento</label>
+          <input id="ps-documento" placeholder="Ej: Liquidación junio 2026" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+        </div>
+        <div style="background:#fef9c3;border-radius:8px;padding:10px;font-size:12px;color:#713f12">
+          💡 El pago se registrará como egreso en la categoría <strong>RR.HH.</strong> y generará asiento automático en el Libro Diario.
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-pagar-sueldo').remove()">Cancelar</button>
+        <button class="btn btn-verde" onclick="ejecutarPagoSueldo('${nombre}')">💵 Confirmar pago</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  document.getElementById('ps-fecha').value = new Date().toISOString().split('T')[0];
+}
+
+async function ejecutarPagoSueldo(nombre) {
+  const fecha = document.getElementById('ps-fecha').value;
+  const monto = Number(document.getElementById('ps-monto').value)||0;
+  const forma = document.getElementById('ps-forma').value;
+  const documento = document.getElementById('ps-documento').value;
+  if (!monto) { alert('Ingresa el monto'); return; }
+  const datos = {
+    fecha, categoria: 'RR.HH.', descripcion: `Sueldo ${nombre}`,
+    proveedor: nombre, monto, forma, documento,
+    fechaRegistro: new Date().toISOString()
+  };
+  try {
+    // Registrar como egreso
+    const ref = await db.collection('egresos').add(datos);
+    // Asiento contable automático
+    await db.collection('libro_diario').add({
+      fecha,
+      glosa: `Pago sueldo ${nombre}`,
+      cuentaDebe: 'Gastos de personal',
+      montoDebe: monto,
+      cuentaHaber: forma==='Efectivo'?'Caja chica':'Banco Estado',
+      montoHaber: monto,
+      documento: documento||'',
+      origen: 'sueldo_automatico',
+      referenciaId: ref.id
+    });
+    document.getElementById('modal-pagar-sueldo').remove();
+    alert(`✅ Sueldo de ${nombre} registrado como egreso y asiento contable generado.`);
+    // Descargar comprobante automáticamente
+    descargarComprobanteEgreso(datos);
+    mostrarTrabajadores();
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+function abrirModalTrabajador(){document.getElementById('modal-trabajador').style.display='flex';}
+function cerrarModalTrabajador(){document.getElementById('modal-trabajador').style.display='none';}
+function guardarTrabajador(){
+  const datos={nombre:document.getElementById('tr-nombre').value,rut:document.getElementById('tr-rut').value,cargo:document.getElementById('tr-cargo').value,telefono:document.getElementById('tr-telefono').value,correo:document.getElementById('tr-correo').value,ingreso:document.getElementById('tr-ingreso').value,sueldo:Number(document.getElementById('tr-sueldo').value)||0};
+  if(!datos.nombre){alert('Ingresa el nombre');return;}
+  db.collection('trabajadores').add(datos).then(()=>{cerrarModalTrabajador();mostrarTrabajadores();}).catch(e=>alert('Error: '+e.message));
+}
+
+// ===================== PUNTO 9: LIBRO DIARIO AUTO desde ingresos/egresos =====================
+// Los registros automáticos ya se hacen en guardarPago() y guardarEgreso() arriba.
+// El libro diario también recibe asientos manuales con su botón + Nuevo asiento.
+
 </body>
 </html>
