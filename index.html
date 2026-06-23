@@ -2415,8 +2415,10 @@ function descargarWordCert(){
 function mostrarAcceso() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn btn-verde" onclick="abrirModalAcceso()">+ Registrar acceso</button>
+      <button class="btn btn-verde" style="background:#1d4ed8" onclick="importarExcelAcceso()">📥 Importar Excel</button>
+      <button class="btn btn-verde" style="background:#166534" onclick="exportarExcelAcceso()">📊 Exportar Excel</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Control de Acceso</h3></div>
@@ -2424,7 +2426,7 @@ function mostrarAcceso() {
     </div>
     <div id="modal-acceso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 style="margin-bottom:20px;color:var(--verde4)">Registrar acceso</h3>
+        <h3 id="modal-acceso-titulo" style="margin-bottom:20px;color:var(--verde4)">Registrar acceso</h3>
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="ac-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="ac-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
@@ -2437,35 +2439,155 @@ function mostrarAcceso() {
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="cerrarModalAcceso()">Cancelar</button>
-          <button class="btn btn-verde" onclick="guardarAcceso()">Guardar</button>
+          <button class="btn btn-verde" id="btn-guardar-acceso" onclick="guardarAcceso()">Guardar</button>
         </div>
       </div>
     </div>`;
+  cargarAcceso();
+}
+
+function cargarAcceso() {
   db.collection('control_acceso').orderBy('unidad').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-acceso').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros de acceso</div>'; return; }
-    let html='<table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th></tr></thead><tbody>';
+    let html='<table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th><th>Acciones</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const a=d.data();
-      html+=`<tr><td>${a.unidad||'—'}</td><td><span class="badge badge-gris">${a.tipo||'—'}</span></td><td>${a.nombre||'—'}</td><td>${a.telefono||'—'}</td><td>${a.posicion||'—'}</td></tr>`;
+      const a=d.data(); const id=d.id;
+      const ds=JSON.stringify(a).replace(/'/g,"&#39;");
+      html+=`<tr>
+        <td><strong>${a.unidad||'—'}</strong></td>
+        <td><span class="badge badge-gris">${a.tipo||'—'}</span></td>
+        <td>${a.nombre||'—'}</td>
+        <td>${a.telefono||'—'}</td>
+        <td>${a.posicion||'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:3px" onclick='editarAcceso("${id}",${ds})'>✏️</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarAcceso('${id}','${(a.nombre||'').replace(/'/g,'')}')">🗑️</button>
+        </td>
+      </tr>`;
     });
     html+='</tbody></table>';
     document.getElementById('lista-acceso').innerHTML=html;
   }).catch(()=>{ document.getElementById('lista-acceso').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros aún</div>'; });
 }
-function abrirModalAcceso(){document.getElementById('modal-acceso').style.display='flex';}
-function cerrarModalAcceso(){document.getElementById('modal-acceso').style.display='none';}
+
+let _editAccesoId = null;
+function abrirModalAcceso(){
+  _editAccesoId=null;
+  document.getElementById('modal-acceso-titulo').textContent='Registrar acceso';
+  document.getElementById('ac-unidad').value='';
+  document.getElementById('ac-tipo').value='Acceso 1';
+  document.getElementById('ac-nombre').value='';
+  document.getElementById('ac-telefono').value='';
+  document.getElementById('ac-posicion').value='';
+  document.getElementById('modal-acceso').style.display='flex';
+}
+function cerrarModalAcceso(){document.getElementById('modal-acceso').style.display='none'; _editAccesoId=null;}
+
+function editarAcceso(id, datos) {
+  _editAccesoId = id;
+  document.getElementById('modal-acceso-titulo').textContent='Editar acceso';
+  document.getElementById('ac-unidad').value=datos.unidad||'';
+  document.getElementById('ac-tipo').value=datos.tipo||'Acceso 1';
+  document.getElementById('ac-nombre').value=datos.nombre||'';
+  document.getElementById('ac-telefono').value=datos.telefono||'';
+  document.getElementById('ac-posicion').value=datos.posicion||'';
+  document.getElementById('modal-acceso').style.display='flex';
+}
+
 function guardarAcceso(){
   const datos={unidad:document.getElementById('ac-unidad').value,tipo:document.getElementById('ac-tipo').value,nombre:document.getElementById('ac-nombre').value,telefono:document.getElementById('ac-telefono').value,posicion:document.getElementById('ac-posicion').value};
   if(!datos.unidad||!datos.nombre){alert('Ingresa la unidad y el nombre');return;}
-  db.collection('control_acceso').add(datos).then(()=>{cerrarModalAcceso();mostrarAcceso();}).catch(e=>alert('Error: '+e.message));
+  const op = _editAccesoId ? db.collection('control_acceso').doc(_editAccesoId).update(datos) : db.collection('control_acceso').add(datos);
+  op.then(()=>{cerrarModalAcceso();cargarAcceso();}).catch(e=>alert('Error: '+e.message));
+}
+
+function eliminarAcceso(id, nombre){
+  if(!confirm('¿Eliminar el registro de '+nombre+'?')) return;
+  db.collection('control_acceso').doc(id).delete().then(()=>cargarAcceso()).catch(e=>alert('Error: '+e.message));
+}
+
+function exportarExcelAcceso(){
+  db.collection('control_acceso').orderBy('unidad').get().then(snap=>{
+    let csv='Unidad,Acceso,Nombre,Teléfono,N° Posición\n';
+    snap.forEach(d=>{const a=d.data();csv+=`${a.unidad||''},${a.tipo||''},"${a.nombre||''}",${a.telefono||''},${a.posicion||''}\n`;});
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='Control_Acceso.csv';a.click();
+  });
+}
+
+function importarExcelAcceso(){
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:500px;max-width:95vw">
+    <h3 style="margin-bottom:8px;color:#1d4ed8">📥 Importar Control de Acceso</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas: <strong>unidad, tipo, nombre, telefono, posicion</strong>. Acepta .xlsx y .csv.</p>
+    <input type="file" id="imp-ac-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
+    <div id="imp-ac-status" style="margin-bottom:12px;font-size:13px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="this.closest('div[style]').remove()">Cancelar</button>
+      <button id="btn-imp-ac" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportAcceso()">✅ Importar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  document.getElementById('imp-ac-file').addEventListener('change', e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const status=document.getElementById('imp-ac-status');
+    status.innerHTML='⏳ Leyendo...';
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try {
+        let rows=[];
+        if(file.name.endsWith('.csv')){
+          const lines=ev.target.result.split('\n').filter(l=>l.trim());
+          const headers=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,''));
+          for(let i=1;i<lines.length;i++){
+            const vals=lines[i].split(/[,;]/);
+            const obj={};
+            headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').trim().replace(/^"|"$/g,''));
+            rows.push(obj);
+          }
+        } else {
+          const data=new Uint8Array(ev.target.result);
+          const wb=XLSX.read(data,{type:'array'});
+          rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+          rows=rows.map(r=>{const n={};Object.keys(r).forEach(k=>n[k.trim().toLowerCase().replace(/[^a-záéíóúñ]/gi,'')]=r[k]);return n;});
+        }
+        window._importAccesoRows=rows.filter(r=>r.unidad||r.nombre).map(r=>({
+          unidad:String(r.unidad||'').trim(),
+          tipo:String(r.tipo||'Acceso 1').trim(),
+          nombre:String(r.nombre||'').trim(),
+          telefono:String(r.telefono||'').trim(),
+          posicion:String(r.posicion||'').trim()
+        })).filter(r=>r.unidad&&r.nombre);
+        status.innerHTML=`✅ ${window._importAccesoRows.length} registros listos.`;
+        document.getElementById('btn-imp-ac').style.display='inline-block';
+      } catch(err){status.innerHTML='❌ Error: '+err.message;}
+    };
+    if(file.name.endsWith('.csv')) reader.readAsText(file,'UTF-8');
+    else reader.readAsArrayBuffer(file);
+  });
+}
+
+async function ejecutarImportAcceso(){
+  if(!window._importAccesoRows||!window._importAccesoRows.length) return;
+  let ok=0;
+  for(const r of window._importAccesoRows){
+    try{await db.collection('control_acceso').add(r);ok++;}catch(e){}
+  }
+  alert(`✅ ${ok} registros importados.`);
+  document.querySelector('div[style*="position:fixed"][style*="z-index:300"]')?.remove();
+  cargarAcceso();
 }
 
 // ===================== CITOFONÍA =====================
 function mostrarCitofonia() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn btn-verde" onclick="abrirModalCitofono()">+ Registrar citófono</button>
+      <button class="btn btn-verde" style="background:#1d4ed8" onclick="importarExcelCitofono()">📥 Importar Excel</button>
+      <button class="btn btn-verde" style="background:#166534" onclick="exportarExcelCitofono()">📊 Exportar Excel</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Registro de Citofonía</h3></div>
@@ -2473,7 +2595,7 @@ function mostrarCitofonia() {
     </div>
     <div id="modal-citofono" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 style="margin-bottom:20px;color:var(--verde4)">Registrar citófono</h3>
+        <h3 id="modal-cito-titulo" style="margin-bottom:20px;color:var(--verde4)">Registrar citófono</h3>
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="ci-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="ci-citofono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
@@ -2490,23 +2612,137 @@ function mostrarCitofonia() {
         </div>
       </div>
     </div>`;
+  cargarCitofonia();
+}
+
+function cargarCitofonia() {
   db.collection('citofonia').orderBy('unidad').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-citofonia').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros de citofonía</div>'; return; }
-    let html='<table><thead><tr><th>Unidad</th><th>Citófono</th><th>Nombre</th><th>Teléfono</th></tr></thead><tbody>';
+    let html='<table><thead><tr><th>Unidad</th><th>Citófono</th><th>Nombre</th><th>Teléfono</th><th>Acciones</th></tr></thead><tbody>';
     snap.forEach(d => {
-      const ci=d.data();
-      html+=`<tr><td>${ci.unidad||'—'}</td><td><span class="badge badge-gris">${ci.citofono||'—'}</span></td><td>${ci.nombre||'—'}</td><td>${ci.telefono||'—'}</td></tr>`;
+      const ci=d.data(); const id=d.id;
+      const ds=JSON.stringify(ci).replace(/'/g,"&#39;");
+      html+=`<tr>
+        <td><strong>${ci.unidad||'—'}</strong></td>
+        <td><span class="badge badge-gris">${ci.citofono||'—'}</span></td>
+        <td>${ci.nombre||'—'}</td>
+        <td>${ci.telefono||'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" style="background:#1d4ed8;color:white;margin-right:3px" onclick='editarCitofono("${id}",${ds})'>✏️</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="eliminarCitofono('${id}','${(ci.nombre||'').replace(/'/g,'')}')">🗑️</button>
+        </td>
+      </tr>`;
     });
     html+='</tbody></table>';
     document.getElementById('lista-citofonia').innerHTML=html;
   }).catch(()=>{ document.getElementById('lista-citofonia').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros aún</div>'; });
 }
-function abrirModalCitofono(){document.getElementById('modal-citofono').style.display='flex';}
-function cerrarModalCitofono(){document.getElementById('modal-citofono').style.display='none';}
+
+let _editCitofonoId = null;
+function abrirModalCitofono(){
+  _editCitofonoId=null;
+  document.getElementById('modal-cito-titulo').textContent='Registrar citófono';
+  document.getElementById('ci-unidad').value='';
+  document.getElementById('ci-citofono').value='Citófono 1';
+  document.getElementById('ci-nombre').value='';
+  document.getElementById('ci-telefono').value='';
+  document.getElementById('modal-citofono').style.display='flex';
+}
+function cerrarModalCitofono(){document.getElementById('modal-citofono').style.display='none'; _editCitofonoId=null;}
+
+function editarCitofono(id, datos) {
+  _editCitofonoId=id;
+  document.getElementById('modal-cito-titulo').textContent='Editar citófono';
+  document.getElementById('ci-unidad').value=datos.unidad||'';
+  document.getElementById('ci-citofono').value=datos.citofono||'Citófono 1';
+  document.getElementById('ci-nombre').value=datos.nombre||'';
+  document.getElementById('ci-telefono').value=datos.telefono||'';
+  document.getElementById('modal-citofono').style.display='flex';
+}
+
 function guardarCitofono(){
   const datos={unidad:document.getElementById('ci-unidad').value,citofono:document.getElementById('ci-citofono').value,nombre:document.getElementById('ci-nombre').value,telefono:document.getElementById('ci-telefono').value};
   if(!datos.unidad||!datos.nombre){alert('Ingresa la unidad y el nombre');return;}
-  db.collection('citofonia').add(datos).then(()=>{cerrarModalCitofono();mostrarCitofonia();}).catch(e=>alert('Error: '+e.message));
+  const op = _editCitofonoId ? db.collection('citofonia').doc(_editCitofonoId).update(datos) : db.collection('citofonia').add(datos);
+  op.then(()=>{cerrarModalCitofono();cargarCitofonia();}).catch(e=>alert('Error: '+e.message));
+}
+
+function eliminarCitofono(id, nombre){
+  if(!confirm('¿Eliminar el registro de '+nombre+'?')) return;
+  db.collection('citofonia').doc(id).delete().then(()=>cargarCitofonia()).catch(e=>alert('Error: '+e.message));
+}
+
+function exportarExcelCitofono(){
+  db.collection('citofonia').orderBy('unidad').get().then(snap=>{
+    let csv='Unidad,Citófono,Nombre,Teléfono\n';
+    snap.forEach(d=>{const ci=d.data();csv+=`${ci.unidad||''},${ci.citofono||''},"${ci.nombre||''}",${ci.telefono||''}\n`;});
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='Citofonia.csv';a.click();
+  });
+}
+
+function importarExcelCitofono(){
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:500px;max-width:95vw">
+    <h3 style="margin-bottom:8px;color:#1d4ed8">📥 Importar Citofonía</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:16px">Columnas: <strong>unidad, citofono, nombre, telefono</strong>. Acepta .xlsx y .csv.</p>
+    <input type="file" id="imp-ci-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:10px;border:2px dashed #ccc;border-radius:8px;font-size:13px;margin-bottom:12px">
+    <div id="imp-ci-status" style="margin-bottom:12px;font-size:13px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="this.closest('div[style]').remove()">Cancelar</button>
+      <button id="btn-imp-ci" class="btn btn-verde" style="display:none;background:#1d4ed8" onclick="ejecutarImportCitofono()">✅ Importar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  document.getElementById('imp-ci-file').addEventListener('change', e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const status=document.getElementById('imp-ci-status');
+    status.innerHTML='⏳ Leyendo...';
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try {
+        let rows=[];
+        if(file.name.endsWith('.csv')){
+          const lines=ev.target.result.split('\n').filter(l=>l.trim());
+          const headers=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,''));
+          for(let i=1;i<lines.length;i++){
+            const vals=lines[i].split(/[,;]/);
+            const obj={};
+            headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').trim().replace(/^"|"$/g,''));
+            rows.push(obj);
+          }
+        } else {
+          const data=new Uint8Array(ev.target.result);
+          const wb=XLSX.read(data,{type:'array'});
+          rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+          rows=rows.map(r=>{const n={};Object.keys(r).forEach(k=>n[k.trim().toLowerCase().replace(/[^a-záéíóúñ]/gi,'')]=r[k]);return n;});
+        }
+        window._importCitofonoRows=rows.filter(r=>r.unidad||r.nombre).map(r=>({
+          unidad:String(r.unidad||'').trim(),
+          citofono:String(r.citofono||'Citófono 1').trim(),
+          nombre:String(r.nombre||'').trim(),
+          telefono:String(r.telefono||'').trim()
+        })).filter(r=>r.unidad&&r.nombre);
+        status.innerHTML=`✅ ${window._importCitofonoRows.length} registros listos.`;
+        document.getElementById('btn-imp-ci').style.display='inline-block';
+      } catch(err){status.innerHTML='❌ Error: '+err.message;}
+    };
+    if(file.name.endsWith('.csv')) reader.readAsText(file,'UTF-8');
+    else reader.readAsArrayBuffer(file);
+  });
+}
+
+async function ejecutarImportCitofono(){
+  if(!window._importCitofonoRows||!window._importCitofonoRows.length) return;
+  let ok=0;
+  for(const r of window._importCitofonoRows){
+    try{await db.collection('citofonia').add(r);ok++;}catch(e){}
+  }
+  alert(`✅ ${ok} registros importados.`);
+  document.querySelector('div[style*="position:fixed"][style*="z-index:300"]')?.remove();
+  cargarCitofonia();
 }
 
 // ===================== ENCOMIENDAS =====================
