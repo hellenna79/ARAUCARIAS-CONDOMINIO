@@ -1202,7 +1202,7 @@ function importarGastosExcel() {
   m.innerHTML = `
     <div style="background:white;border-radius:16px;padding:28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
       <h3 style="margin-bottom:6px;color:#1d4ed8">📥 Importar Gastos Comunes desde Excel</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:16px">El sistema importa <strong>todas las columnas</strong> tal cual están en tu planilla. Columnas reconocidas: unidad, residente, prorrateo, gcEgresos, totalMes, capitalAtrasado, intereses, cargos, abonos, totalCobrado, saldoFavor.</p>
+      <p style="font-size:12px;color:#666;margin-bottom:8px">Compatible con tu planilla de Condominio las Araucarias. Los encabezados se detectan automáticamente.</p>
       <div style="background:#fef9c3;border-radius:8px;padding:10px;font-size:12px;color:#713f12;margin-bottom:12px">
         ⚠️ Al importar se <strong>reemplazarán</strong> los datos actuales de la planilla.
       </div>
@@ -1224,71 +1224,86 @@ function importarGastosExcel() {
     const reader = new FileReader();
     reader.onload = ev => {
       try {
-        let rows = [];
-        if (file.name.endsWith('.csv')) {
-          const lines = ev.target.result.split('\n').filter(l => l.trim());
-          const headers = lines[0].split(/[,;]/).map(h => h.trim().replace(/^"|"$/g,''));
-          for (let i=1; i<lines.length; i++) {
-            const vals = lines[i].split(/[,;]/);
-            const obj = {};
-            headers.forEach((h,idx) => obj[h] = (vals[idx]||'').trim().replace(/^"|"$/g,''));
-            rows.push(obj);
-          }
-        } else {
-          const data = new Uint8Array(ev.target.result);
-          const wb = XLSX.read(data, {type:'array'});
-          rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
-        }
+        const data = new Uint8Array(ev.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const allRows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-        // Mapear columnas flexiblemente
-        const mapCol = (row, posibles) => {
-          for (const p of posibles) {
-            const k = Object.keys(row).find(k => k.toLowerCase().replace(/\s/g,'').replace(/[^a-záéíóúñ]/gi,'') === p.toLowerCase().replace(/\s/g,'').replace(/[^a-záéíóúñ]/gi,''));
-            if (k && row[k] !== '' && row[k] !== null) return row[k];
+        // Buscar fila de encabezados: la que contenga "Unidad" o "unidad"
+        let headerIdx = -1;
+        for (let i = 0; i < allRows.length; i++) {
+          if (allRows[i].some(c => String(c).toLowerCase().trim() === 'unidad')) {
+            headerIdx = i;
+            break;
+          }
+        }
+        if (headerIdx === -1) { status.innerHTML = '❌ No se encontró fila de encabezados con "Unidad"'; return; }
+
+        const headers = allRows[headerIdx].map(h => String(h).trim());
+        const dataRows = allRows.slice(headerIdx + 1).filter(r => r[headers.indexOf('Unidad')] || r[1]);
+
+        // Mapear columnas flexiblemente por nombre
+        const getCol = (row, nombres) => {
+          for (const n of nombres) {
+            const idx = headers.findIndex(h => h.toLowerCase().includes(n.toLowerCase()));
+            if (idx >= 0 && row[idx] !== '' && row[idx] !== null && row[idx] !== undefined) return row[idx];
+          }
+          return 0;
+        };
+        const getColStr = (row, nombres) => {
+          for (const n of nombres) {
+            const idx = headers.findIndex(h => h.toLowerCase().includes(n.toLowerCase()));
+            if (idx >= 0 && row[idx] !== '') return String(row[idx]).trim();
           }
           return '';
         };
 
-        window._importGCRows = rows.map(r => {
-          const unidad = String(mapCol(r,['unidad','unit','dpto'])||'').trim();
-          if (!unidad) return null;
+        window._importGCRows = dataRows.map(r => {
+          const unidad = String(getCol(r,['Unidad'])||'').trim().replace(/\.0$/,'');
+          if (!unidad || unidad === '0') return null;
           return {
             unidad,
-            residente: String(mapCol(r,['residente','nombre','propietario'])||'').trim(),
-            prorrateo: Number(String(mapCol(r,['prorrateo','prorratio'])||0).replace(/[^0-9.-]/g,'')),
-            gcEgresos: Number(String(mapCol(r,['gcEgresos','gcegresos','gc egresos','egresos'])||0).replace(/[^0-9.-]/g,'')),
-            totalMes: Number(String(mapCol(r,['totalMes','totalmes','total mes','total_mes'])||0).replace(/[^0-9.-]/g,'')),
-            capitalAtrasado: Number(String(mapCol(r,['capitalAtrasado','capitalatrasado','capital atrasado','capital'])||0).replace(/[^0-9.-]/g,'')),
-            intereses: Number(String(mapCol(r,['intereses','interes','interest'])||0).replace(/[^0-9.-]/g,'')),
-            cargos: Number(String(mapCol(r,['cargos','cargo','charges'])||0).replace(/[^0-9.-]/g,'')),
-            abonos: Number(String(mapCol(r,['abonos','abono'])||0).replace(/[^0-9.-]/g,'')),
-            totalCobrado: Number(String(mapCol(r,['totalCobrado','totalcobrado','total cobrado','cobrado'])||0).replace(/[^0-9.-]/g,'')),
-            saldoFavor: Number(String(mapCol(r,['saldoFavor','saldofavor','saldo favor','saldo'])||0).replace(/[^0-9.-]/g,''))
+            residente: getColStr(r, ['Residente','Nombre','Propietario']),
+            saldoAnterior: Number(getCol(r,['Saldo a Favor','saldo a favor','Saldo Anterior']))||0,
+            prorrateo: Number(getCol(r,['Prorrateo']))||0,
+            gcEgresos: Number(getCol(r,['Gasto común - Egresos','Egresos','GC Egresos','gcEgresos']))||0,
+            cargos: Number(getCol(r,['Cargos impagos','Cargos','cargos']))||0,
+            totalMes: Number(getCol(r,['Total mes','totalMes','Total Mes']))||0,
+            capitalAtrasado: Number(getCol(r,['Capital Atrasado','capitalAtrasado']))||0,
+            intereses: Number(getCol(r,['Intereses y multas','Intereses','intereses']))||0,
+            abonos: Number(getCol(r,['Abonos']))||0,
+            totalCobrado: Number(getCol(r,['Total cobrado','totalCobrado']))||0,
+            saldoFavor: Number(getCol(r,['Saldo a favor','saldoFavor','Saldo Favor']))||0
           };
         }).filter(r => r && r.unidad);
 
-        if (!window._importGCRows.length) { status.innerHTML = '⚠️ No se encontraron filas válidas.'; return; }
-        
-        status.innerHTML = `✅ <strong>${window._importGCRows.length} unidades</strong> listas para importar.`;
+        if (!window._importGCRows.length) { status.innerHTML = '⚠️ No se encontraron filas válidas. Verifica que el encabezado tenga "Unidad".'; return; }
+
+        status.innerHTML = `✅ <strong>${window._importGCRows.length} unidades</strong> detectadas correctamente.`;
         document.getElementById('btn-imp-gc').style.display = 'inline-block';
 
-        // Preview
-        const cols = Object.keys(window._importGCRows[0]);
-        let html = `<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1d4ed8;color:white">`;
-        cols.forEach(c => html += `<th style="padding:5px">${c}</th>`);
-        html += '</tr></thead><tbody>';
-        window._importGCRows.slice(0,5).forEach(r => {
-          html += '<tr style="border-bottom:1px solid #eee">';
-          cols.forEach(c => html += `<td style="padding:4px 5px;text-align:right">${typeof r[c]==='number'&&r[c]>0?'$'+r[c].toLocaleString('es-CL'):r[c]||''}</td>`);
-          html += '</tr>';
+        // Preview tabla
+        let html = `<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1d4ed8;color:white">
+          <th style="padding:5px">Unidad</th><th style="padding:5px">Residente</th><th style="padding:5px">Prorrateo</th>
+          <th style="padding:5px">Cargos</th><th style="padding:5px">Capital Atrasado</th><th style="padding:5px">Intereses</th><th style="padding:5px">Total Cobrado</th>
+        </tr></thead><tbody>`;
+        window._importGCRows.slice(0,6).forEach(r => {
+          html += `<tr style="border-bottom:1px solid #eee">
+            <td style="padding:4px 5px;text-align:center"><strong>${r.unidad}</strong></td>
+            <td style="padding:4px 5px">${r.residente}</td>
+            <td style="padding:4px 5px;text-align:right">$${r.prorrateo.toLocaleString('es-CL')}</td>
+            <td style="padding:4px 5px;text-align:right">$${r.cargos.toLocaleString('es-CL')}</td>
+            <td style="padding:4px 5px;text-align:right;color:#dc2626">$${r.capitalAtrasado.toLocaleString('es-CL')}</td>
+            <td style="padding:4px 5px;text-align:right;color:#f97316">$${r.intereses.toLocaleString('es-CL')}</td>
+            <td style="padding:4px 5px;text-align:right;font-weight:600">$${r.totalCobrado.toLocaleString('es-CL')}</td>
+          </tr>`;
         });
-        if (window._importGCRows.length > 5) html += `<tr><td colspan="${cols.length}" style="padding:6px;text-align:center;color:#666">...y ${window._importGCRows.length-5} filas más</td></tr>`;
+        if (window._importGCRows.length > 6) html += `<tr><td colspan="7" style="padding:6px;text-align:center;color:#666">...y ${window._importGCRows.length-6} unidades más</td></tr>`;
         html += '</tbody></table>';
         preview.innerHTML = html;
-      } catch(err) { status.innerHTML = '❌ Error: ' + err.message; }
+      } catch(err) { status.innerHTML = '❌ Error leyendo archivo: ' + err.message; }
     };
-    if (file.name.endsWith('.csv')) reader.readAsText(file, 'UTF-8');
-    else reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(file);
   });
 }
 
