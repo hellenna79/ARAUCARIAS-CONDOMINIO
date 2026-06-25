@@ -1029,26 +1029,58 @@ function procesarImportEgreso(input) {
   const reader = new FileReader();
   reader.onload = function(ev) {
     const text = ev.target.result;
-    const lines = text.split('\n').map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g,'')));
-    // Detectar fila de encabezado buscando "Fecha" o "Descripcion"
+    const lines = text.split('\n').filter(l => l.trim());
+
+    // Detectar separador: punto y coma (Chile) o coma
+    const sep = lines[0] && lines[0].includes(';') ? ';' : ',';
+
+    // Parser que respeta campos entre comillas
+    function parseLine(line) {
+      const cols = []; let cur = ''; let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === sep && !inQ) { cols.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim());
+      return cols;
+    }
+
+    // Detectar fila de encabezado
     let startRow = 0;
     for (let i = 0; i < Math.min(lines.length, 10); i++) {
-      if (lines[i].some(c => /fecha/i.test(c) || /descripci/i.test(c))) { startRow = i + 1; break; }
+      const row = parseLine(lines[i]);
+      if (row.some(c => /fecha/i.test(c) || /descripci/i.test(c) || /monto/i.test(c))) {
+        startRow = i + 1; break;
+      }
     }
+
+    // Parsear monto chileno: "$99.157" → 99157
+    function parseMonto(str) {
+      return parseFloat((str||'').replace(/[$\s]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+    }
+
+    // Parsear fecha dd/mm/yyyy o dd-mm-yyyy → yyyy-mm-dd
+    function parseFecha(str) {
+      str = (str||'').trim();
+      // ya formato yyyy-mm-dd
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+      const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      return '';
+    }
+
     const errores = []; let importados = 0;
     const batch = db.batch();
+
     for (let i = startRow; i < lines.length; i++) {
-      const cols = lines[i];
-      if (cols.length < 3 || !cols[2]) continue; // fila vacía
+      const cols = parseLine(lines[i]);
       // Columnas: Proveedor(0), Rut(1), Fecha(2), Descripción(3), Categoría(4), Período(5), Monto(6), Estado(7), Forma(8)
-      const fechaRaw = cols[2] || '';
-      // Convertir dd/mm/yyyy a yyyy-mm-dd si es necesario
-      let fecha = fechaRaw;
-      const m = fechaRaw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-      if (m) fecha = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-      const montoStr = (cols[6]||'').replace(/[$.\s]/g,'').replace(',','.');
-      const monto = parseFloat(montoStr) || 0;
-      if (!fecha || !monto) { errores.push('Fila '+(i+1)+': fecha o monto inválido'); continue; }
+      const fecha = parseFecha(cols[2]);
+      const monto = parseMonto(cols[6]);
+      if (!fecha) { errores.push('Fila '+(i+1)+': fecha inválida ("'+cols[2]+'")'); continue; }
+      if (!monto) { errores.push('Fila '+(i+1)+': monto inválido ("'+cols[6]+'")'); continue; }
       const ref = db.collection('egresos').doc();
       batch.set(ref, {
         proveedor: cols[0]||'',
@@ -1065,10 +1097,18 @@ function procesarImportEgreso(input) {
       });
       importados++;
     }
+
+    if (importados === 0) {
+      alert('⚠️ No se pudo importar ningún egreso.\n\nVerifica que:\n• El archivo sea CSV (.csv)\n• Las columnas sean: Proveedor, Rut, Fecha, Descripción, Categoría, Período, Monto, Estado, Tipo doc.\n• La fecha esté en formato dd/mm/yyyy\n• El monto use punto como separador de miles (ej: $99.157)\n\nErrores encontrados:\n' + errores.slice(0,5).join('\n'));
+      return;
+    }
+
     batch.commit().then(() => {
-      alert('✅ Importación completada: ' + importados + ' egresos cargados.' + (errores.length ? '\n⚠️ Filas con error: ' + errores.join('; ') : ''));
+      let msg = '✅ Importación completada: ' + importados + ' egresos cargados.';
+      if (errores.length) msg += '\n⚠️ ' + errores.length + ' filas con error (omitidas).';
+      alert(msg);
       cargarEgresos();
-    }).catch(e => alert('Error al importar: ' + e.message));
+    }).catch(e => alert('Error al guardar: ' + e.message));
   };
   reader.readAsText(file, 'UTF-8');
   input.value = '';
