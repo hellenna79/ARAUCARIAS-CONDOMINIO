@@ -1009,9 +1009,68 @@ function importarEgresosExcel() {
   document.getElementById('input-importar-egreso').click();
 }
 
+// Dispatcher seguro — lee datos desde _egresosMap en vez de pasar JSON en onclick
+function accionEgreso(accion, id, menuId) {
+  toggleMenuEgreso(menuId);
+  const datos = (window._egresosMap || {})[id];
+  if (!datos && accion !== 'eliminar' && accion !== 'anular') { alert('No se encontraron datos del egreso.'); return; }
+  if (accion === 'ver')     verEgreso(id, datos);
+  else if (accion === 'editar')   editarEgreso(id, datos);
+  else if (accion === 'anular')   anularEgreso(id);
+  else if (accion === 'eliminar') eliminarEgreso(id);
+  else if (accion === 'pdf')  { _egresoActual={id,datos}; descargarEgresoActual('pdf'); }
+  else if (accion === 'excel'){ _egresoActual={id,datos}; descargarEgresoActual('excel'); }
+  else if (accion === 'word') { _egresoActual={id,datos}; descargarEgresoActual('word'); }
+}
+
 function procesarImportEgreso(input) {
   if (!input.files[0]) return;
-  alert('Función de importación: el archivo se procesará próximamente. Por ahora usa "+ Registrar egreso" para ingresar manualmente.');
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const text = ev.target.result;
+    const lines = text.split('\n').map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g,'')));
+    // Detectar fila de encabezado buscando "Fecha" o "Descripcion"
+    let startRow = 0;
+    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+      if (lines[i].some(c => /fecha/i.test(c) || /descripci/i.test(c))) { startRow = i + 1; break; }
+    }
+    const errores = []; let importados = 0;
+    const batch = db.batch();
+    for (let i = startRow; i < lines.length; i++) {
+      const cols = lines[i];
+      if (cols.length < 3 || !cols[2]) continue; // fila vacía
+      // Columnas: Proveedor(0), Rut(1), Fecha(2), Descripción(3), Categoría(4), Período(5), Monto(6), Estado(7), Forma(8)
+      const fechaRaw = cols[2] || '';
+      // Convertir dd/mm/yyyy a yyyy-mm-dd si es necesario
+      let fecha = fechaRaw;
+      const m = fechaRaw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+      if (m) fecha = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      const montoStr = (cols[6]||'').replace(/[$.\s]/g,'').replace(',','.');
+      const monto = parseFloat(montoStr) || 0;
+      if (!fecha || !monto) { errores.push('Fila '+(i+1)+': fecha o monto inválido'); continue; }
+      const ref = db.collection('egresos').doc();
+      batch.set(ref, {
+        proveedor: cols[0]||'',
+        rut: cols[1]||'',
+        fecha,
+        descripcion: cols[3]||'',
+        categoria: cols[4]||'Otro',
+        periodo: cols[5]||'',
+        monto,
+        estado: cols[7]||'Pagado',
+        forma: cols[8]||'Transferencia',
+        importado: true,
+        fechaImport: new Date().toISOString()
+      });
+      importados++;
+    }
+    batch.commit().then(() => {
+      alert('✅ Importación completada: ' + importados + ' egresos cargados.' + (errores.length ? '\n⚠️ Filas con error: ' + errores.join('; ') : ''));
+      cargarEgresos();
+    }).catch(e => alert('Error al importar: ' + e.message));
+  };
+  reader.readAsText(file, 'UTF-8');
   input.value = '';
 }
 
@@ -1114,10 +1173,13 @@ function cargarEgresos() {
     document.getElementById('egresos-servicios').textContent = '$'+servicios.toLocaleString('es-CL');
     document.getElementById('egresos-rrhh').textContent = '$'+rrhh.toLocaleString('es-CL');
     if (!egresosDelMes.length) { document.getElementById('lista-egresos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay egresos para ' + nomMes + ' ' + _egresosAnio + '</div>'; return; }
+    // Guardar datos en mapa seguro para evitar problemas de escape en onclick
+    window._egresosMap = {};
+    egresosDelMes.forEach(e => { window._egresosMap[e.id] = e; });
     let html = '<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Monto</th><th>Forma</th><th>Doc.</th><th>Comprobante</th><th style="width:40px"></th></tr></thead><tbody>';
     egresosDelMes.forEach((e,i) => {
       const menuId = 'menu-eg-'+i;
-      const datosStr = JSON.stringify(e).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      const eid = e.id;
       html += `<tr>
         <td>${e.fecha||'—'}</td>
         <td><span class="badge badge-gris">${e.categoria||'—'}</span></td>
@@ -1126,19 +1188,22 @@ function cargarEgresos() {
         <td style="text-align:right;font-weight:600">$${Number(e.monto||0).toLocaleString('es-CL')}</td>
         <td>${e.forma||'—'}</td>
         <td style="color:#666">${e.documento||'—'}</td>
-        <td style="text-align:center">${e.comprobanteURL?`<a href="${e.comprobanteURL}" target="_blank" style="color:#1a7a4a;text-decoration:none;font-size:18px" title="Ver comprobante">📎</a>`:`<label style="cursor:pointer;color:#bbb;font-size:11px" title="Subir comprobante"><input type="file" accept="image/*,.pdf" style="display:none" onchange="subirComprobanteEgreso(this,'${e.id}')">📎 subir</label>`}</td>
+        <td style="text-align:center">${e.comprobanteURL
+          ? `<a href="${e.comprobanteURL}" target="_blank" style="color:#1a7a4a;text-decoration:none;font-size:18px" title="Ver comprobante">📎</a>`
+          : `<label style="cursor:pointer;color:#aaa;font-size:11px" title="Subir comprobante"><input type="file" accept="image/*,.pdf" style="display:none" onchange="subirComprobanteEgreso(this,'${eid}')">📎 subir</label>`}
+        </td>
         <td style="position:relative">
-          <button class="btn btn-sm" style="background:#f5f5f5;border:1px solid #ddd;padding:4px 8px;font-size:16px" onclick="toggleMenuEgreso('${menuId}')">⋮</button>
-          <div id="${menuId}" class="menu-acciones-egreso" style="display:none;position:absolute;right:0;top:28px;background:white;border:1px solid var(--borde);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;min-width:160px;padding:6px 0">
-            <div onclick="verEgreso('${e.id}',${datosStr});toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">👁️ Ver egreso</div>
-            <div onclick="editarEgreso('${e.id}',${datosStr});toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">✏️ Editar</div>
-            <div onclick="anularEgreso('${e.id}');toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;color:#f97316;display:flex;align-items:center;gap:8px">🚫 Anular</div>
+          <button class="btn btn-sm" style="background:#f5f5f5;border:1px solid #ddd;padding:4px 10px;font-size:18px;line-height:1" onclick="event.stopPropagation();toggleMenuEgreso('${menuId}')">⋮</button>
+          <div id="${menuId}" class="menu-acciones-egreso" style="display:none;position:absolute;right:0;top:32px;background:white;border:1px solid var(--borde);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:300;min-width:175px;padding:6px 0">
+            <div onclick="accionEgreso('ver','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">👁️ Ver egreso</div>
+            <div onclick="accionEgreso('editar','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">✏️ Editar</div>
+            <div onclick="accionEgreso('anular','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;color:#f97316;display:flex;align-items:center;gap:8px">🚫 Anular</div>
             <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="eliminarEgreso('${e.id}');toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:8px">🗑️ Eliminar</div>
+            <div onclick="accionEgreso('eliminar','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:8px">🗑️ Eliminar</div>
             <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="_egresoActual={id:'${e.id}',datos:${datosStr}};descargarEgresoActual('pdf');toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">📄 Descargar PDF</div>
-            <div onclick="_egresoActual={id:'${e.id}',datos:${datosStr}};descargarEgresoActual('excel');toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">📊 Descargar Excel</div>
-            <div onclick="_egresoActual={id:'${e.id}',datos:${datosStr}};descargarEgresoActual('word');toggleMenuEgreso('${menuId}')" style="padding:9px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">📝 Descargar Word</div>
+            <div onclick="accionEgreso('pdf','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">📄 Descargar PDF</div>
+            <div onclick="accionEgreso('excel','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">📊 Descargar Excel</div>
+            <div onclick="accionEgreso('word','${eid}','${menuId}')" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px">📝 Descargar Word</div>
           </div>
         </td>
       </tr>`;
