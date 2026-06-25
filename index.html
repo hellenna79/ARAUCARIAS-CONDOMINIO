@@ -1795,13 +1795,17 @@ function mostrarFlujoCaja() {
   Promise.all([db.collection('pagos').get(), db.collection('egresos').get()]).then(([pagosSnap, egresosSnap]) => {
     const meses = {};
     pagosSnap.forEach(d => {
-      const p = d.data(); if (!p.fecha) return;
+      const p = d.data();
+      if (!p.fecha || p.tipo === 'Ajuste') return; // Ajustes no son ingresos reales
       const mes = p.fecha.slice(0,7);
       if (!meses[mes]) meses[mes]={ingresos:0,egresos:0};
       meses[mes].ingresos += Number(p.monto||0);
     });
     egresosSnap.forEach(d => {
-      const e = d.data(); if (!e.fecha) return;
+      const e = d.data();
+      if (!e.fecha || e.anulado) return;
+      // Ajuste/Compensación no mueve dinero real, solo afecta gastos comunes
+      if((e.forma||'').toLowerCase().includes('ajuste')) return;
       const mes = e.fecha.slice(0,7);
       if (!meses[mes]) meses[mes]={ingresos:0,egresos:0};
       meses[mes].egresos += Number(e.monto||0);
@@ -2373,11 +2377,33 @@ function descargarWordCert(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='Certificado_AraucariasS.doc';a.click();
 }
+// Exportar colección Firestore a CSV
+function exportarCSV(coleccion, nombreArchivo) {
+  db.collection(coleccion).get().then(snap => {
+    if(snap.empty){alert('No hay datos para exportar');return;}
+    const campos = Object.keys(snap.docs[0].data());
+    let csv = '\uFEFF' + campos.join(';') + '\n';
+    snap.forEach(d => {
+      const row = campos.map(c => '"'+(d.data()[c]||'')+'"').join(';');
+      csv += row + '\n';
+    });
+    const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download = nombreArchivo+'_'+new Date().toLocaleDateString('es-CL').replace(/\//g,'-')+'.csv';
+    a.click();
+  }).catch(e=>alert('Error al exportar: '+e.message));
+}
+
+let _editAccesoId = null;
+
 function mostrarAcceso() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-verde" onclick="abrirModalAcceso()">+ Registrar acceso</button>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportarCSV('control_acceso','Control_Acceso')">📥 Exportar Excel</button>
+      <input type="file" id="import-acceso-file" accept=".csv" style="display:none" onchange="importarCSVAcceso(this)">
+      <button class="btn btn-outline" onclick="document.getElementById('import-acceso-file').click()">📤 Importar CSV</button>
+      <button class="btn btn-verde" onclick="abrirModalAcceso(null)">+ Registrar acceso</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Control de Acceso</h3></div>
@@ -2385,12 +2411,13 @@ function mostrarAcceso() {
     </div>
     <div id="modal-acceso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 style="margin-bottom:20px;color:var(--verde4)">Registrar acceso</h3>
+        <h3 id="modal-acceso-titulo" style="margin-bottom:20px;color:var(--verde4)">Registrar acceso</h3>
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="ac-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="ac-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
             <option value="Acceso 1">Acceso 1</option>
             <option value="Acceso 2">Acceso 2</option>
+            <option value="Ambos">Ambos</option>
           </select>
           <input id="ac-nombre" placeholder="Nombre de la persona" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <input id="ac-telefono" placeholder="Número de teléfono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
@@ -2402,31 +2429,79 @@ function mostrarAcceso() {
         </div>
       </div>
     </div>`;
-  db.collection('control_acceso').orderBy('unidad').get().then(snap => {
+  cargarAcceso();
+}
+
+function cargarAcceso() {
+  db.collection('control_acceso').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-acceso').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros de acceso</div>'; return; }
-    let html='<table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const a=d.data();
-      html+=`<tr><td>${a.unidad||'—'}</td><td><span class="badge badge-gris">${a.tipo||'—'}</span></td><td>${a.nombre||'—'}</td><td>${a.telefono||'—'}</td><td>${a.posicion||'—'}</td></tr>`;
+    const docs = []; snap.forEach(d => docs.push({id:d.id,...d.data()}));
+    docs.sort((a,b) => parseInt(a.unidad||0)-parseInt(b.unidad||0));
+    let html='<div style="overflow-x:auto"><table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th><th>Acciones</th></tr></thead><tbody>';
+    docs.forEach(a => {
+      html+=`<tr><td><strong>${a.unidad||'—'}</strong></td><td><span class="badge badge-gris">${a.tipo||'—'}</span></td><td>${a.nombre||'—'}</td><td>${a.telefono||'—'}</td><td>${a.posicion||'—'}</td>
+        <td style="white-space:nowrap">
+          <button onclick="abrirModalAcceso('${a.id}')" style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:4px">✏️</button>
+          <button onclick="eliminarAcceso('${a.id}')" style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px">🗑️</button>
+        </td></tr>`;
     });
-    html+='</tbody></table>';
+    html+='</tbody></table></div>';
     document.getElementById('lista-acceso').innerHTML=html;
   }).catch(()=>{ document.getElementById('lista-acceso').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros aún</div>'; });
 }
-function abrirModalAcceso(){document.getElementById('modal-acceso').style.display='flex';}
-function cerrarModalAcceso(){document.getElementById('modal-acceso').style.display='none';}
+
+function abrirModalAcceso(id){
+  _editAccesoId=id||null;
+  document.getElementById('modal-acceso-titulo').textContent=id?'Editar acceso':'Registrar acceso';
+  document.getElementById('ac-unidad').value=''; document.getElementById('ac-nombre').value='';
+  document.getElementById('ac-telefono').value=''; document.getElementById('ac-posicion').value='';
+  document.getElementById('ac-tipo').value='Acceso 1';
+  if(id){ db.collection('control_acceso').doc(id).get().then(doc=>{ if(doc.exists){ const a=doc.data();
+    document.getElementById('ac-unidad').value=a.unidad||''; document.getElementById('ac-tipo').value=a.tipo||'Acceso 1';
+    document.getElementById('ac-nombre').value=a.nombre||''; document.getElementById('ac-telefono').value=a.telefono||'';
+    document.getElementById('ac-posicion').value=a.posicion||'';
+  }}); }
+  document.getElementById('modal-acceso').style.display='flex';
+}
+function cerrarModalAcceso(){document.getElementById('modal-acceso').style.display='none';_editAccesoId=null;}
 function guardarAcceso(){
   const datos={unidad:document.getElementById('ac-unidad').value,tipo:document.getElementById('ac-tipo').value,nombre:document.getElementById('ac-nombre').value,telefono:document.getElementById('ac-telefono').value,posicion:document.getElementById('ac-posicion').value};
   if(!datos.unidad||!datos.nombre){alert('Ingresa la unidad y el nombre');return;}
-  db.collection('control_acceso').add(datos).then(()=>{cerrarModalAcceso();mostrarAcceso();}).catch(e=>alert('Error: '+e.message));
+  const op=_editAccesoId?db.collection('control_acceso').doc(_editAccesoId).update(datos):db.collection('control_acceso').add(datos);
+  op.then(()=>{cerrarModalAcceso();cargarAcceso();}).catch(e=>alert('Error: '+e.message));
+}
+function eliminarAcceso(id){
+  if(!confirm('¿Eliminar este registro de acceso?'))return;
+  db.collection('control_acceso').doc(id).delete().then(()=>cargarAcceso()).catch(e=>alert('Error: '+e.message));
+}
+function importarCSVAcceso(input){
+  if(!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const lines=ev.target.result.split(/\r?\n/).filter(l=>l.trim());
+    const sep=lines[0].includes(';')?';':',';
+    const batch=db.batch(); let n=0;
+    for(let i=1;i<lines.length;i++){
+      const cols=lines[i].split(sep).map(c=>c.trim().replace(/^"+|"+$/g,''));
+      if(!cols[0])continue;
+      batch.set(db.collection('control_acceso').doc(),{unidad:cols[0],tipo:cols[1]||'Acceso 1',nombre:cols[2]||'',telefono:cols[3]||'',posicion:cols[4]||''}); n++;
+    }
+    batch.commit().then(()=>{alert('✅ '+n+' registros importados');cargarAcceso();}).catch(e=>alert('Error: '+e.message));
+  };
+  reader.readAsText(input.files[0],'UTF-8'); input.value='';
 }
 
 // ===================== CITOFONÍA =====================
+let _editCitofoniaId = null;
+
 function mostrarCitofonia() {
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-verde" onclick="abrirModalCitofono()">+ Registrar citófono</button>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportarCSV('citofonia','Citofonia')">📥 Exportar Excel</button>
+      <input type="file" id="import-citofonia-file" accept=".csv" style="display:none" onchange="importarCSVCitofonia(this)">
+      <button class="btn btn-outline" onclick="document.getElementById('import-citofonia-file').click()">📤 Importar CSV</button>
+      <button class="btn btn-verde" onclick="abrirModalCitofono(null)">+ Registrar citófono</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Registro de Citofonía</h3></div>
@@ -2434,7 +2509,7 @@ function mostrarCitofonia() {
     </div>
     <div id="modal-citofono" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:white;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-        <h3 style="margin-bottom:20px;color:var(--verde4)">Registrar citófono</h3>
+        <h3 id="modal-citofono-titulo" style="margin-bottom:20px;color:var(--verde4)">Registrar citófono</h3>
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="ci-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <select id="ci-citofono" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
@@ -2451,23 +2526,64 @@ function mostrarCitofonia() {
         </div>
       </div>
     </div>`;
-  db.collection('citofonia').orderBy('unidad').get().then(snap => {
+  cargarCitofonia();
+}
+
+function cargarCitofonia(){
+  db.collection('citofonia').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-citofonia').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros de citofonía</div>'; return; }
-    let html='<table><thead><tr><th>Unidad</th><th>Citófono</th><th>Nombre</th><th>Teléfono</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const ci=d.data();
-      html+=`<tr><td>${ci.unidad||'—'}</td><td><span class="badge badge-gris">${ci.citofono||'—'}</span></td><td>${ci.nombre||'—'}</td><td>${ci.telefono||'—'}</td></tr>`;
+    const docs=[]; snap.forEach(d=>docs.push({id:d.id,...d.data()}));
+    docs.sort((a,b)=>parseInt(a.unidad||0)-parseInt(b.unidad||0));
+    let html='<div style="overflow-x:auto"><table><thead><tr><th>Unidad</th><th>Citófono</th><th>Nombre</th><th>Teléfono</th><th>Acciones</th></tr></thead><tbody>';
+    docs.forEach(ci => {
+      html+=`<tr><td><strong>${ci.unidad||'—'}</strong></td><td><span class="badge badge-gris">${ci.citofono||'—'}</span></td><td>${ci.nombre||'—'}</td><td>${ci.telefono||'—'}</td>
+        <td style="white-space:nowrap">
+          <button onclick="abrirModalCitofono('${ci.id}')" style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:4px">✏️</button>
+          <button onclick="eliminarCitofonia('${ci.id}')" style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px">🗑️</button>
+        </td></tr>`;
     });
-    html+='</tbody></table>';
+    html+='</tbody></table></div>';
     document.getElementById('lista-citofonia').innerHTML=html;
   }).catch(()=>{ document.getElementById('lista-citofonia').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin registros aún</div>'; });
 }
-function abrirModalCitofono(){document.getElementById('modal-citofono').style.display='flex';}
-function cerrarModalCitofono(){document.getElementById('modal-citofono').style.display='none';}
+
+function abrirModalCitofono(id){
+  _editCitofoniaId=id||null;
+  document.getElementById('modal-citofono-titulo').textContent=id?'Editar citófono':'Registrar citófono';
+  document.getElementById('ci-unidad').value=''; document.getElementById('ci-nombre').value=''; document.getElementById('ci-telefono').value='';
+  document.getElementById('ci-citofono').value='Citófono 1';
+  if(id){ db.collection('citofonia').doc(id).get().then(doc=>{ if(doc.exists){ const ci=doc.data();
+    document.getElementById('ci-unidad').value=ci.unidad||''; document.getElementById('ci-citofono').value=ci.citofono||'Citófono 1';
+    document.getElementById('ci-nombre').value=ci.nombre||''; document.getElementById('ci-telefono').value=ci.telefono||'';
+  }}); }
+  document.getElementById('modal-citofono').style.display='flex';
+}
+function cerrarModalCitofono(){document.getElementById('modal-citofono').style.display='none';_editCitofoniaId=null;}
 function guardarCitofono(){
   const datos={unidad:document.getElementById('ci-unidad').value,citofono:document.getElementById('ci-citofono').value,nombre:document.getElementById('ci-nombre').value,telefono:document.getElementById('ci-telefono').value};
   if(!datos.unidad||!datos.nombre){alert('Ingresa la unidad y el nombre');return;}
-  db.collection('citofonia').add(datos).then(()=>{cerrarModalCitofono();mostrarCitofonia();}).catch(e=>alert('Error: '+e.message));
+  const op=_editCitofoniaId?db.collection('citofonia').doc(_editCitofoniaId).update(datos):db.collection('citofonia').add(datos);
+  op.then(()=>{cerrarModalCitofono();cargarCitofonia();}).catch(e=>alert('Error: '+e.message));
+}
+function eliminarCitofonia(id){
+  if(!confirm('¿Eliminar este registro de citofonía?'))return;
+  db.collection('citofonia').doc(id).delete().then(()=>cargarCitofonia()).catch(e=>alert('Error: '+e.message));
+}
+function importarCSVCitofonia(input){
+  if(!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const lines=ev.target.result.split(/\r?\n/).filter(l=>l.trim());
+    const sep=lines[0].includes(';')?';':',';
+    const batch=db.batch(); let n=0;
+    for(let i=1;i<lines.length;i++){
+      const cols=lines[i].split(sep).map(c=>c.trim().replace(/^"+|"+$/g,''));
+      if(!cols[0])continue;
+      batch.set(db.collection('citofonia').doc(),{unidad:cols[0],citofono:cols[1]||'Citófono 1',nombre:cols[2]||'',telefono:cols[3]||''}); n++;
+    }
+    batch.commit().then(()=>{alert('✅ '+n+' registros importados');cargarCitofonia();}).catch(e=>alert('Error: '+e.message));
+  };
+  reader.readAsText(input.files[0],'UTF-8'); input.value='';
 }
 
 // ===================== ENCOMIENDAS =====================
@@ -3149,9 +3265,11 @@ function cargarConciliacion2() {
     });
     eSnap.forEach(d => {
       const e = d.data();
-      if(!e.fecha||e.fecha<inicio||e.fecha>fin) return;
+      if(!e.fecha||e.fecha<inicio||e.fecha>fin||e.anulado) return;
+      // Ajuste/Compensación NO afecta banco ni caja
+      if((e.forma||'').toLowerCase().includes('ajuste')||(e.formaPago||'').toLowerCase().includes('ajuste')) return;
       const m = Number(e.monto||0);
-      if(esBanco(e.formaPago)){ banco.push({f:e.fecha,desc:`Egreso - ${e.descripcion||e.categoria||''}`,ing:0,egr:m}); egrB+=m; }
+      if(esBanco(e.forma||e.formaPago||'')){ banco.push({f:e.fecha,desc:`Egreso - ${e.descripcion||e.categoria||''}`,ing:0,egr:m}); egrB+=m; }
       else { caja.push({f:e.fecha,desc:`Egreso efvo - ${e.descripcion||e.categoria||''}`,ing:0,egr:m}); egrC+=m; }
     });
 
@@ -3363,52 +3481,173 @@ async function ejecutarImportacion(){
 }
 
 // ===== CARTA DE AVISO =====
+// Plantillas de carta aviso guardadas en Firestore
+window._editPlantillaId = null;
+
 function abrirCartaAviso(){
-  const tipos={ruido:'Ruidos molestos',estacionamiento:'Estacionamiento indebido',tenencia:'Tenencia responsable mascotas',reglamento:'Incumplimiento reglamento'};
-  const textos={
-    ruido:`Junto con saludarle, vengo en señalar que existen reclamos por ruidos molestos en las dependencias de su unidad.\n\nDe conformidad a nuestro reglamento interno en su artículo Décimo, no se podrá ejecutar acto alguno ya sea gritos o cualquier ruido molesto que perturbe la tranquilidad de los demás ocupantes del condominio. La música se debe escuchar siempre a un volumen moderado, todo lo anterior en concordancia con la Ley de Copropiedad Inmobiliaria 21.442.\n\nPor lo anterior, le solicitamos colaborar con la tranquilidad y buena convivencia al interior de nuestra comunidad. Al haber reincidencia se cursará una multa de 1 UTM.\n\nCualquier consulta comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,`,
-    estacionamiento:`Junto con saludarle, vengo en señalar que existen reclamos de infracción por mal estacionamiento en reiteradas ocasiones.\n\nDe conformidad al Reglamento de Copropiedad, cada usuario sólo podrá ocupar el o los estacionamientos asignados a su propiedad. No podrá estacionarse en los pasajes del condominio ni en los lugares que no estén destinados a dicho uso. Todo lo anterior en concordancia con la Ley 21.442.\n\nPor lo anterior, le solicitamos colaborar con la buena convivencia. El comité administrativo está facultado para cursar una multa de 1 UTM al haber reincidencia.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,`,
-    tenencia:`Junto con saludarle, vengo en representar la necesidad del debido cuidado y responsabilidad de su mascota, atendido a reclamos recibidos.\n\nEl artículo 23° de nuestro Reglamento dispone que los copropietarios pondrán especial cuidado en el traslado de sus mascotas por el interior del condominio. No está permitido que anden sueltos por las zonas comunes; deberán ser conducidos con cadena o correa.\n\nLe solicitamos respetar estas normas para resguardar la convivencia al interior del condominio.\n\nComuníquese a adm.lasaraucarias2020@gmail.com o al +56982187738\n\nSin otro particular saluda atentamente,`,
-    reglamento:`Junto con saludarle, se han recibido reclamos relacionados con el incumplimiento del Reglamento Interno del Condominio Las Araucarias.\n\nLe recordamos que todos los copropietarios, arrendatarios y ocupantes están obligados a respetar las normas del Reglamento de Copropiedad, en concordancia con la Ley N°21.442.\n\nLe solicitamos corregir la situación a la brevedad. De lo contrario el Comité Administrativo aplicará las sanciones establecidas en el Reglamento.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nSin otro particular saluda atentamente,`
-  };
-  if(document.getElementById('modal-carta-aviso')){ document.getElementById('modal-carta-aviso').style.display='flex'; return; }
+  if(document.getElementById('modal-carta-aviso')){ document.getElementById('modal-carta-aviso').style.display='flex'; cargarPlantillasAviso(); return; }
   const m=document.createElement('div');
   m.id='modal-carta-aviso';
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:600px;max-width:96vw;max-height:90vh;overflow-y:auto">
-    <h3 style="margin-bottom:16px;color:#8e44ad">📋 Carta de Aviso</h3>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tipo de aviso</label>
-          <select id="ca-tipo" onchange="document.getElementById('ca-cuerpo').value=({ruido:${JSON.stringify(textos.ruido)},estacionamiento:${JSON.stringify(textos.estacionamiento)},tenencia:${JSON.stringify(textos.tenencia)},reglamento:${JSON.stringify(textos.reglamento)}})[this.value]||''" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-            <option value="ruido">Ruidos molestos</option>
-            <option value="estacionamiento">Estacionamiento indebido</option>
-            <option value="tenencia">Tenencia responsable mascotas</option>
-            <option value="reglamento">Incumplimiento reglamento</option>
-          </select></div>
-        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Carta</label>
-          <input id="ca-numero" type="number" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Unidad</label>
-          <input id="ca-unidad" placeholder="Ej: 21" oninput="db.collection('residentes').where('unidad','==',this.value).get().then(s=>{if(!s.empty)document.getElementById('ca-nombre').value=s.docs[0].data().nombre||''})" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
-        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Nombre</label>
-          <input id="ca-nombre" placeholder="Se llena automático" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
-      </div>
-      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Fecha</label>
-        <input id="ca-fecha" type="date" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Cuerpo de la carta (editable)</label>
-        <textarea id="ca-cuerpo" rows="10" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical;line-height:1.6">${textos.ruido}</textarea></div>
+  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:680px;max-width:96vw;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="color:#8e44ad;margin:0">📋 Carta de Aviso</h3>
+      <button onclick="document.getElementById('modal-carta-aviso').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
     </div>
-    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
-      <button class="btn btn-outline" onclick="document.getElementById('modal-carta-aviso').style.display='none'">Cancelar</button>
-      <button class="btn btn-verde" onclick="generarCartaAviso2()">👁️ Vista previa e imprimir</button>
-      <button class="btn" style="background:#16a085;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="guardarRegistroCarta('aviso')">💾 Registrar carta</button>
+    <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #eee">
+      <button onclick="switchTabAviso('redactar')" id="tab-redactar" style="padding:8px 16px;background:#8e44ad;color:white;border:none;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:600">✏️ Redactar carta</button>
+      <button onclick="switchTabAviso('plantillas')" id="tab-plantillas" style="padding:8px 16px;background:#f5f5f5;color:#666;border:none;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px">📁 Mis plantillas</button>
+    </div>
+    <div id="panel-redactar">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tipo / Plantilla</label>
+            <select id="ca-tipo" onchange="aplicarTextoAviso(this.value)" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+              <option value="ruido">Ruidos molestos</option>
+              <option value="estacionamiento">Estacionamiento indebido</option>
+              <option value="tenencia">Tenencia responsable mascotas</option>
+              <option value="reglamento">Incumplimiento reglamento</option>
+              <option value="juegos">Juegos espacios comunes</option>
+              <option value="multa_inasistencia">Multa inasistencia asamblea</option>
+              <option value="personalizado">— Mi plantilla guardada —</option>
+            </select></div>
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Carta</label>
+            <input id="ca-numero" type="number" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
+        </div>
+        <div id="selector-plantilla-aviso" style="display:none">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Seleccionar plantilla guardada</label>
+          <select id="ca-plantilla-sel" onchange="aplicarPlantillaGuardada(this.value)" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="">-- Selecciona una plantilla --</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Unidad</label>
+            <input id="ca-unidad" placeholder="Ej: 21" oninput="db.collection('residentes').where('unidad','==',this.value).get().then(s=>{if(!s.empty)document.getElementById('ca-nombre').value=s.docs[0].data().nombre||''})" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Nombre</label>
+            <input id="ca-nombre" placeholder="Se llena automático" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
+        </div>
+        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Fecha</label>
+          <input id="ca-fecha" type="date" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <label style="font-size:12px;font-weight:600">Cuerpo de la carta (editable)</label>
+            <button onclick="guardarComoPlantillaAviso()" style="background:#8e44ad;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px">💾 Guardar como plantilla</button>
+          </div>
+          <textarea id="ca-cuerpo" rows="10" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical;line-height:1.6"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-carta-aviso').style.display='none'">Cancelar</button>
+        <button class="btn btn-verde" onclick="generarCartaAviso2()">👁️ Vista previa e imprimir</button>
+        <button class="btn" style="background:#16a085;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="guardarRegistroCarta('aviso')">💾 Registrar carta</button>
+      </div>
+    </div>
+    <div id="panel-plantillas" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button onclick="abrirNuevaPlantillaAviso(null)" class="btn btn-verde">+ Nueva plantilla</button>
+      </div>
+      <div id="lista-plantillas-aviso"><div style="text-align:center;padding:24px;color:#999">Cargando...</div></div>
+    </div>
+    <div id="panel-nueva-plantilla" style="display:none">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Nombre de la plantilla</label>
+          <input id="np-nombre" placeholder="Ej: JUEGOS ESPACIOS COMUNES" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Texto de la carta (editable)</label>
+          <textarea id="np-cuerpo" rows="12" placeholder="Escribe el cuerpo del texto..." style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical;line-height:1.6"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="switchTabAviso('plantillas')">Cancelar</button>
+        <button class="btn btn-verde" onclick="guardarPlantillaAviso()">💾 Guardar plantilla</button>
+      </div>
     </div>
   </div>`;
   document.body.appendChild(m);
   document.getElementById('ca-fecha').value=new Date().toISOString().split('T')[0];
+  aplicarTextoAviso('ruido');
+  cargarPlantillasAviso();
 }
+
+const _textosAviso = {
+  ruido:'Junto con saludarle, vengo en señalar que existen reclamos por ruidos molestos en las dependencias de su unidad.\n\nDe conformidad a nuestro reglamento interno en su artículo Décimo, no se podrá ejecutar acto alguno ya sea gritos o cualquier ruido molesto que perturbe la tranquilidad de los demás ocupantes del condominio. La música se debe escuchar siempre a un volumen moderado, todo lo anterior en concordancia con la Ley de Copropiedad Inmobiliaria 21.442.\n\nPor lo anterior, le solicitamos colaborar con la tranquilidad y buena convivencia al interior de nuestra comunidad. Al haber reincidencia se cursará una multa de 1 UTM.\n\nCualquier consulta comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  estacionamiento:'Junto con saludarle, vengo en señalar que existen reclamos de infracción por mal estacionamiento en reiteradas ocasiones.\n\nDe conformidad al Reglamento de Copropiedad, cada usuario sólo podrá ocupar el o los estacionamientos asignados a su propiedad. No podrá estacionarse en los pasajes del condominio ni en los lugares que no estén destinados a dicho uso. Todo lo anterior en concordancia con la Ley 21.442.\n\nPor lo anterior, le solicitamos colaborar con la buena convivencia. El comité administrativo está facultado para cursar una multa de 1 UTM al haber reincidencia.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  tenencia:'Junto con saludarle, vengo en representar la necesidad del debido cuidado y responsabilidad de su mascota, atendido a reclamos recibidos.\n\nEl artículo 23° de nuestro Reglamento dispone que los copropietarios pondrán especial cuidado en el traslado de sus mascotas por el interior del condominio. No está permitido que anden sueltos por las zonas comunes; deberán ser conducidos con cadena o correa.\n\nLe solicitamos respetar estas normas para resguardar la convivencia al interior del condominio.\n\nComuníquese a adm.lasaraucarias2020@gmail.com o al +56982187738\n\nSin otro particular saluda atentamente,',
+  reglamento:'Junto con saludarle, se han recibido reclamos relacionados con el incumplimiento del Reglamento Interno del Condominio Las Araucarias.\n\nLe recordamos que todos los copropietarios, arrendatarios y ocupantes están obligados a respetar las normas del Reglamento de Copropiedad, en concordancia con la Ley N°21.442.\n\nLe solicitamos corregir la situación a la brevedad. De lo contrario el Comité Administrativo aplicará las sanciones establecidas en el Reglamento.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nSin otro particular saluda atentamente,',
+  juegos:'Junto con saludarle, vengo en recordar que el uso de los espacios comunes del Condominio Las Araucarias debe realizarse conforme al Reglamento Interno.\n\nEl juego de niños en pasillos, estacionamientos y áreas no habilitadas genera riesgo para la seguridad de los residentes y provoca deterioro de las instalaciones.\n\nLe solicitamos orientar a sus hijos u otros ocupantes de la unidad para utilizar únicamente las áreas de juegos habilitadas.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  multa_inasistencia:'Junto con saludarle, le informamos que su unidad no asistió a la Asamblea de Copropietarios ni presentó excusa válida ante la Administración.\n\nEn conformidad al Artículo Décimo Cuarto del Reglamento de Copropiedad, la inasistencia injustificada genera una multa de $10.000 (diez mil pesos), la cual ha sido cargada a su cuenta de gastos comunes.\n\nPara mayor información comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,'
+};
+
+function aplicarTextoAviso(tipo){
+  const t=document.getElementById('ca-cuerpo');
+  const selPlant=document.getElementById('selector-plantilla-aviso');
+  if(!t) return;
+  if(tipo==='personalizado'){ if(selPlant) selPlant.style.display='block'; cargarSelectPlantillas(); }
+  else { if(selPlant) selPlant.style.display='none'; t.value=_textosAviso[tipo]||''; }
+}
+function cargarSelectPlantillas(){
+  db.collection('plantillas_aviso').orderBy('nombre').get().then(snap=>{
+    const sel=document.getElementById('ca-plantilla-sel'); if(!sel) return;
+    sel.innerHTML='<option value="">-- Selecciona una plantilla --</option>';
+    snap.forEach(d=>{ const p=d.data(); sel.innerHTML+=`<option value="${d.id}">${p.nombre||'Sin nombre'}</option>`; });
+  }).catch(()=>{});
+}
+function aplicarPlantillaGuardada(id){
+  if(!id) return;
+  db.collection('plantillas_aviso').doc(id).get().then(doc=>{ if(doc.exists){ const t=document.getElementById('ca-cuerpo'); if(t) t.value=doc.data().cuerpo||''; } });
+}
+function switchTabAviso(tab){
+  ['panel-redactar','panel-plantillas','panel-nueva-plantilla'].forEach(p=>{const el=document.getElementById(p);if(el)el.style.display='none';});
+  ['tab-redactar','tab-plantillas'].forEach(t=>{const el=document.getElementById(t);if(el){el.style.background='#f5f5f5';el.style.color='#666';}});
+  const panelId=tab==='redactar'?'panel-redactar':tab==='plantillas'?'panel-plantillas':'panel-nueva-plantilla';
+  const tabId=tab==='redactar'?'tab-redactar':tab==='plantillas'?'tab-plantillas':null;
+  const el=document.getElementById(panelId); if(el) el.style.display='block';
+  if(tabId){const btn=document.getElementById(tabId);if(btn){btn.style.background='#8e44ad';btn.style.color='white';}}
+  if(tab==='plantillas') cargarPlantillasAviso();
+}
+function cargarPlantillasAviso(){
+  const div=document.getElementById('lista-plantillas-aviso'); if(!div) return;
+  db.collection('plantillas_aviso').orderBy('nombre').get().then(snap=>{
+    if(snap.empty){div.innerHTML='<div style="padding:24px;text-align:center;color:#999">No hay plantillas. Crea una con "+ Nueva plantilla"</div>';return;}
+    let html='<table><thead><tr><th>Nombre</th><th>Acciones</th></tr></thead><tbody>';
+    snap.forEach(d=>{const p=d.data();html+=`<tr><td style="font-weight:600">${p.nombre||'Sin nombre'}</td><td style="white-space:nowrap">
+      <button onclick="usarPlantilla('${d.id}')" style="background:#8e44ad;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-right:4px">✏️ Usar</button>
+      <button onclick="editarPlantillaAviso('${d.id}')" style="background:#2980b9;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-right:4px">🖊️ Editar</button>
+      <button onclick="eliminarPlantillaAviso('${d.id}')" style="background:#c0392b;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">🗑️</button>
+    </td></tr>`;}); html+='</tbody></table>'; div.innerHTML=html;
+  }).catch(()=>{div.innerHTML='<div style="padding:24px;text-align:center;color:#999">Error cargando plantillas</div>';});
+}
+function abrirNuevaPlantillaAviso(id){
+  window._editPlantillaId=id||null;
+  ['panel-redactar','panel-plantillas'].forEach(p=>{const el=document.getElementById(p);if(el)el.style.display='none';});
+  document.getElementById('panel-nueva-plantilla').style.display='block';
+  document.getElementById('np-nombre').value=''; document.getElementById('np-cuerpo').value='';
+}
+function editarPlantillaAviso(id){
+  db.collection('plantillas_aviso').doc(id).get().then(doc=>{if(!doc.exists)return;abrirNuevaPlantillaAviso(id);document.getElementById('np-nombre').value=doc.data().nombre||'';document.getElementById('np-cuerpo').value=doc.data().cuerpo||'';});
+}
+function guardarPlantillaAviso(){
+  const nombre=document.getElementById('np-nombre').value.trim();
+  const cuerpo=document.getElementById('np-cuerpo').value.trim();
+  if(!nombre||!cuerpo){alert('Ingresa el nombre y el texto de la plantilla');return;}
+  const id=window._editPlantillaId;
+  const op=id?db.collection('plantillas_aviso').doc(id).set({nombre,cuerpo}):db.collection('plantillas_aviso').add({nombre,cuerpo});
+  op.then(()=>{alert('✅ Plantilla guardada');switchTabAviso('plantillas');}).catch(e=>alert('Error: '+e.message));
+}
+function eliminarPlantillaAviso(id){
+  if(!confirm('¿Eliminar esta plantilla?'))return;
+  db.collection('plantillas_aviso').doc(id).delete().then(()=>cargarPlantillasAviso()).catch(e=>alert('Error: '+e.message));
+}
+function usarPlantilla(id){
+  db.collection('plantillas_aviso').doc(id).get().then(doc=>{if(!doc.exists)return;const t=document.getElementById('ca-cuerpo');if(t)t.value=doc.data().cuerpo||'';switchTabAviso('redactar');});
+}
+function guardarComoPlantillaAviso(){
+  const cuerpo=document.getElementById('ca-cuerpo')?.value?.trim();
+  if(!cuerpo){alert('Escribe el texto de la carta primero');return;}
+  const nombre=prompt('Nombre para esta plantilla:','');
+  if(!nombre)return;
+  db.collection('plantillas_aviso').add({nombre,cuerpo}).then(()=>alert('✅ Plantilla guardada: '+nombre)).catch(e=>alert('Error: '+e.message));
+}
+
+
 
 function generarCartaAviso2(){
   const unidad=document.getElementById('ca-unidad')?.value||'';
