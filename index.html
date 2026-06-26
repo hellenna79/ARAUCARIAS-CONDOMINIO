@@ -3652,29 +3652,54 @@ function guardarComoPlantillaAviso(){
 function generarCartaAviso2(){
   const unidad=document.getElementById('ca-unidad')?.value||'';
   const nombre=document.getElementById('ca-nombre')?.value||'';
-  const num=document.getElementById('ca-numero')?.value||'1';
   const fechaRaw=document.getElementById('ca-fecha')?.value||new Date().toISOString().split('T')[0];
   const cuerpo=document.getElementById('ca-cuerpo')?.value||'';
-  const tipoEl=document.getElementById('ca-tipo');
-  const tipoTxt=tipoEl?tipoEl.options[tipoEl.selectedIndex].text:'Aviso';
   const [y,m,d]=fechaRaw.split('-');
   const mes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(m)-1];
-  const html=`<!DOCTYPE html><html><head><title>Carta Aviso</title><style>body{font-family:Arial,sans-serif;font-size:13px;padding:50px;max-width:700px;margin:0 auto;line-height:1.8}@media print{body{padding:30px}}</style></head><body>
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #0f4a2c">
-      <img src="${LOGO_B64}" style="height:60px;width:auto" alt="Logo">
-      <div><div style="font-size:15px;font-weight:700;color:#0f4a2c">CONDOMINIO LAS ARAUCARIAS</div>
-      <div style="font-size:11px;color:#555">Sargento Aldea 67, La Cruz, Quillota · RUT: 53.321.396-0</div></div>
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carta de Aviso</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:13px;padding:60px;max-width:720px;margin:0 auto;line-height:1.9;color:#1a1a1a}
+    @media print{body{padding:40px}}
+    .encabezado{text-align:center;margin-bottom:28px}
+    .nombre-condominio{font-size:15px;font-weight:700;color:#2E7D32;letter-spacing:0.5px}
+    .sub-encabezado{font-size:11.5px;color:#666;margin-top:2px}
+    .titulo-carta{text-align:center;font-size:14px;font-weight:700;color:#2E7D32;letter-spacing:0.5px;margin:24px 0 0}
+    .linea-verde{border:none;border-top:2px solid #2E7D32;margin:8px 0 24px}
+    .destinatario{margin-bottom:20px;line-height:2}
+    .cuerpo{text-align:justify;white-space:pre-line;margin-bottom:40px;line-height:1.9}
+    .firma{margin-top:60px}
+    .firma-linea{border-top:1px solid #333;width:280px;padding-top:6px;margin-top:4px;font-size:12px}
+    .firma-nombre{font-weight:700;font-size:12.5px}
+    .firma-cargo{color:#555;font-size:11.5px}
+  </style>
+  </head><body>
+    <div class="encabezado">
+      <div class="nombre-condominio">CONDOMINIO LAS ARAUCARIAS</div>
+      <div class="sub-encabezado">La Cruz, Quillota</div>
+      <div class="sub-encabezado">adm.lasaraucarias2020@gmail.com</div>
+      <div class="sub-encabezado">La Cruz, ${parseInt(d)} de ${mes} de ${y}</div>
     </div>
-    <p style="text-align:right">La Cruz, ${parseInt(d)} de ${mes} ${y}.-</p>
-    <p>Señor/a</p><p>${nombre||'Propietario/a'}.</p><p>Casa N° ${unidad}</p><p>Presente.</p><br>
-    <p style="white-space:pre-line;text-align:justify">${cuerpo}</p>
-    <div style="margin-top:50px;display:flex;justify-content:space-between;align-items:flex-end">
-      <div style="text-align:center"><img src="${FIRMA_B64}" style="height:85px;width:auto;display:block;margin:0 auto" alt="Firma">
-        <div style="border-top:1px solid #333;padding-top:6px;margin-top:4px;font-size:12px">
-          <strong>ELENA DEL CARMEN MATURANA TORO</strong><br>Administradora — Condominio LAS ARAUCARIAS
-        </div>
+
+    <div class="titulo-carta">CARTA DE AVISO</div>
+    <hr class="linea-verde">
+
+    <div class="destinatario">
+      <div>${nombre||'Señor/a Propietario/a'}</div>
+      <div>Casa N° ${unidad}</div>
+      <div>Presente.</div>
+    </div>
+
+    <div class="cuerpo">${cuerpo}</div>
+
+    <div class="firma">
+      <img src="${FIRMA_B64}" style="height:80px;width:auto;display:block;margin-bottom:4px" alt="Firma">
+      <div class="firma-linea">
+        <div class="firma-nombre">ELENA DEL CARMEN MATURANA TORO</div>
+        <div class="firma-cargo">Administradora — Condominio Las Araucarias</div>
       </div>
-      <div><img src="${TIMBRE_B64}" style="height:80px;width:auto" alt="Timbre"></div>
+    </div>
+    <div style="position:absolute;bottom:60px;right:60px">
+      <img src="${TIMBRE_B64}" style="height:80px;width:auto" alt="Timbre">
     </div>
   </body></html>`;
   const v=window.open('','_blank');
