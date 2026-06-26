@@ -3995,15 +3995,24 @@ function generarCitacion2(){
   const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
   const dSem=dias[new Date(parseInt(ya),parseInt(ma)-1,parseInt(da)).getDay()];
   const puntosHtml=puntos.split('\n').filter(p=>p.trim()).map(p=>`<li>${p}</li>`).join('');
-  const html=`<!DOCTYPE html><html><head><title>Citación Asamblea</title><style>body{font-family:Arial,sans-serif;font-size:13px;padding:50px;max-width:700px;margin:0 auto;line-height:1.8}@media print{body{padding:30px}}li{margin-bottom:4px}</style></head><body>
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #0f4a2c">
-      <img src="${LOGO_B64}" style="height:60px;width:auto" alt="Logo">
-      <div><div style="font-size:15px;font-weight:700;color:#0f4a2c">CONDOMINIO LAS ARAUCARIAS</div>
-      <div style="font-size:11px;color:#555">Sargento Aldea 67, La Cruz, Quillota · RUT: 53.321.396-0</div></div>
+  const html=`<!DOCTYPE html><html><head><title>Citación Asamblea</title><style>
+    body{font-family:Arial,sans-serif;font-size:13px;padding:60px;max-width:720px;margin:0 auto;line-height:1.9;color:#1a1a1a}
+    @media print{body{padding:40px}}
+    .encabezado{text-align:center;margin-bottom:28px}
+    .nombre-condominio{font-size:15px;font-weight:700;color:#2E7D32;letter-spacing:0.5px}
+    .sub-encabezado{font-size:11.5px;color:#666;margin-top:2px}
+    .titulo-carta{text-align:center;font-size:14px;font-weight:700;color:#2E7D32;letter-spacing:0.5px;margin:24px 0 0}
+    .linea-verde{border:none;border-top:2px solid #2E7D32;margin:8px 0 24px}
+    li{margin-bottom:4px}
+  </style></head><body>
+    <div class="encabezado">
+      <div class="nombre-condominio">CONDOMINIO LAS ARAUCARIAS</div>
+      <div class="sub-encabezado">La Cruz, Quillota</div>
+      <div class="sub-encabezado">adm.lasaraucarias2020@gmail.com</div>
+      <div class="sub-encabezado">La Cruz, ${parseInt(dc)} de ${meses[parseInt(mc)-1]} de ${yc}</div>
     </div>
-    <p style="text-align:right">La Cruz, ${parseInt(dc)} de ${meses[parseInt(mc)-1]} ${yc}.-</p>
-    <p style="font-weight:700;font-size:14px;text-align:center;text-decoration:underline">CITACIÓN ASAMBLEA ${tipo.toUpperCase()} DE COPROPIETARIOS</p>
-    <p style="text-align:center;font-weight:600">Condominio LAS ARAUCARIAS</p><br>
+    <div class="titulo-carta">CITACIÓN ASAMBLEA ${tipo.toUpperCase()} DE COPROPIETARIOS</div>
+    <hr class="linea-verde">
     <p>Estimados residentes:</p><br>
     <p style="text-align:justify">El Comité de Administración del Condominio Las Araucarias, en conformidad con las facultades que le entrega el artículo 14 y 16 de la Ley Copropiedad N°21.442, se permite citar a los copropietarios a una Asamblea <strong>${tipo}</strong> para el día <strong>${dSem.charAt(0).toUpperCase()+dSem.slice(1)} ${parseInt(da)} de ${meses[parseInt(ma)-1]} del ${ya}</strong> a las <strong>${hora} hrs</strong>, en dependencias de la ${lugar}.</p><br>
     <p style="text-align:justify">Sólo podrán participar con derecho a voto los "copropietarios hábiles", de forma personal o representado mediante poder simple enviado previamente a adm.lasaraucarias2020@gmail.com</p><br>
@@ -4067,14 +4076,24 @@ function generarNotifMulta(){
   const monto=parseInt(document.getElementById('nm-monto')?.value||0);
   const motivo=document.getElementById('nm-motivo')?.value||'';
   const mes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(m)-1];
-  const html=`<!DOCTYPE html><html><head><title>Notificación Multa</title><style>body{font-family:Arial,sans-serif;font-size:13px;padding:50px;max-width:700px;margin:0 auto;line-height:1.8}@media print{body{padding:30px}}</style></head><body>
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #0f4a2c">
-      <img src="${LOGO_B64}" style="height:60px;width:auto" alt="Logo">
-      <div><div style="font-size:15px;font-weight:700;color:#0f4a2c">CONDOMINIO LAS ARAUCARIAS</div>
-      <div style="font-size:11px;color:#555">Sargento Aldea 67, La Cruz, Quillota · RUT: 53.321.396-0</div></div>
+  const html=`<!DOCTYPE html><html><head><title>Notificación Multa</title><style>
+    body{font-family:Arial,sans-serif;font-size:13px;padding:60px;max-width:720px;margin:0 auto;line-height:1.9;color:#1a1a1a}
+    @media print{body{padding:40px}}
+    .encabezado{text-align:center;margin-bottom:28px}
+    .nombre-condominio{font-size:15px;font-weight:700;color:#2E7D32;letter-spacing:0.5px}
+    .sub-encabezado{font-size:11.5px;color:#666;margin-top:2px}
+    .titulo-carta{text-align:center;font-size:14px;font-weight:700;color:#2E7D32;letter-spacing:0.5px;margin:24px 0 0}
+    .linea-verde{border:none;border-top:2px solid #2E7D32;margin:8px 0 24px}
+  </style></head><body>
+    <div class="encabezado">
+      <div class="nombre-condominio">CONDOMINIO LAS ARAUCARIAS</div>
+      <div class="sub-encabezado">La Cruz, Quillota</div>
+      <div class="sub-encabezado">adm.lasaraucarias2020@gmail.com</div>
+      <div class="sub-encabezado">La Cruz, ${parseInt(d)} de ${mes} de ${y}</div>
     </div>
-    <p style="text-align:right">La Cruz, ${parseInt(d)} de ${mes} ${y}.-</p>
-    <p>Señor(a)</p><p>${nombre}</p><p>Propietario.</p><p>Casa N° ${unidad}</p><p>Presente.</p>
+    <div class="titulo-carta">NOTIFICACIÓN DE MULTA</div>
+    <hr class="linea-verde">
+    <p>Señor(a) ${nombre}</p><p>Casa/Dpto N° ${unidad}</p><p>Presente.</p><br>
     <p>De nuestra consideración,</p><br>
     <p style="white-space:pre-line;text-align:justify">${motivo}</p>
     ${monto>0?`<p style="font-weight:700;color:#c0392b;font-size:14px">Monto de la multa: $${monto.toLocaleString('es-CL')}</p>`:''}
