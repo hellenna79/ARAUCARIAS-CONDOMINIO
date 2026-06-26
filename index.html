@@ -1415,22 +1415,16 @@ const ENCABEZADO_HTML = `
       </div>
     </div>
     <div style="text-align:right;font-size:11px;color:#555;padding-top:8px">
-      <div style="font-weight:600">Elena Maturana</div>
       <div>adm.lasaraucarias2020@gmail.com</div>
-      <div>+56 9 8218 7738</div>
     </div>
   </div>`;
 
 const FIRMA_HTML = `
-  <div style="margin-top:40px;display:flex;align-items:flex-end;gap:40px">
-    <div style="text-align:center">
-      <img src="${FIRMA_B64}" style="height:90px;width:auto" alt="Firma">
-      <div style="border-top:1px solid #333;padding-top:6px;margin-top:4px">
-        <div style="font-weight:700;font-size:13px">ELENA DEL CARMEN MATURANA TORO</div>
-        <div style="font-size:12px">Representante legal</div>
-        <div style="font-size:12px">Condominio LAS ARAUCARIAS</div>
-        <div style="font-size:12px">RUT: 53.321.396-0</div>
-      </div>
+  <div style="margin-top:40px;text-align:center">
+    <img src="${TIMBRE_B64}" style="height:90px;width:auto;display:block;margin:0 auto 8px auto" alt="Timbre">
+    <div style="border-top:1px solid #333;width:280px;margin:0 auto;padding-top:8px">
+      <div style="font-weight:700;font-size:13px">COMITÉ DE ADMINISTRACIÓN</div>
+      <div style="font-size:12px;color:#555">Condominio Las Araucarias — La Cruz</div>
     </div>
   </div>`;
 
@@ -1512,7 +1506,13 @@ function generarCarta() {
       <p style="font-size:12px;font-style:italic;color:#444;border-left:4px solid #1a7a4a;padding-left:12px">"En consecuencia, el saldo adeudado solo por concepto de gastos comunes hasta la fecha asciende a un total de <strong>$${deudaBase.toLocaleString('es-CL')}</strong>, cifra que no incluye los intereses y cargos adicionales previamente detallados. Se solicita al copropietario contactar a la administración a la brevedad para establecer una modalidad de pago, evitando así la interrupción del suministro eléctrico."</p>
       ${obsHtml}<br><br>
       <p style="text-align:center">Saluda atentamente,</p><br>
-      <div style="text-align:center"><p>_______________________________</p><p style="font-weight:700">Administración</p><p>Condominio Las Araucarias</p></div>`;
+      <div style="margin-top:40px;text-align:center">
+        <img src="${TIMBRE_B64}" style="height:80px;width:auto;display:block;margin:0 auto 8px auto" alt="Timbre">
+        <div style="border-top:1px solid #333;width:260px;margin:0 auto;padding-top:8px">
+          <div style="font-weight:700;font-size:13px">COMITÉ DE ADMINISTRACIÓN</div>
+          <div style="font-size:12px;color:#555">Condominio Las Araucarias — La Cruz</div>
+        </div>
+      </div>`;
 
   } else {
     // VERIFICACION
@@ -1538,7 +1538,14 @@ function generarCarta() {
       </table>
       <p style="font-size:11px;color:#666;font-style:italic">Los intereses se calculan a una tasa de 0,1173% diario (3,52% mensual), conforme a la Ley N° 21.442 y acuerdo de asamblea.</p>
       ${obsHtml}
-      <br><br><div style="text-align:center"><p>_______________________________</p><p style="font-weight:700">Administración</p><p>Condominio Las Araucarias</p></div>`;
+      <br><br>
+      <div style="margin-top:40px;text-align:center">
+        <img src="${TIMBRE_B64}" style="height:80px;width:auto;display:block;margin:0 auto 8px auto" alt="Timbre">
+        <div style="border-top:1px solid #333;width:260px;margin:0 auto;padding-top:8px">
+          <div style="font-weight:700;font-size:13px">COMITÉ DE ADMINISTRACIÓN</div>
+          <div style="font-size:12px;color:#555">Condominio Las Araucarias — La Cruz</div>
+        </div>
+      </div>`;
   }
 
   cerrarModalCarta();
@@ -3770,9 +3777,12 @@ function generarCitacion2(){
     <p style="text-align:justify">Sólo podrán participar con derecho a voto los "copropietarios hábiles", de forma personal o representado mediante poder simple enviado previamente a adm.lasaraucarias2020@gmail.com</p><br>
     ${obs?`<p style="font-weight:700;text-align:justify">${obs}</p><br>`:''}
     ${puntosHtml?`<p style="font-weight:700">Puntos a revisar en la asamblea:</p><ul>${puntosHtml}</ul><br>`:''}
-    <div style="margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end">
-      <div style="font-size:13px;line-height:2"><strong>Administrador:</strong> Elena Maturana<br><strong>Correo:</strong> adm.lasaraucarias2020@gmail.com<br><strong>Teléfono:</strong> 56982187738</div>
-      <div style="text-align:center"><img src="${FIRMA_B64}" style="height:70px;width:auto;display:block;margin:0 auto" alt="Firma"><div style="border-top:1px solid #333;padding-top:4px;font-size:11px">Firma</div><br><img src="${TIMBRE_B64}" style="height:70px;width:auto" alt="Timbre"></div>
+    <div style="margin-top:50px;text-align:center">
+      <img src="${TIMBRE_B64}" style="height:90px;width:auto;display:block;margin:0 auto 8px auto" alt="Timbre">
+      <div style="border-top:1px solid #333;width:260px;margin:0 auto;padding-top:8px">
+        <div style="font-weight:700;font-size:13px">COMITÉ DE ADMINISTRACIÓN</div>
+        <div style="font-size:12px;color:#555">Condominio Las Araucarias — La Cruz</div>
+      </div>
     </div>
   </body></html>`;
   const v=window.open('','_blank');
@@ -3836,15 +3846,12 @@ function generarNotifMulta(){
     <p>De nuestra consideración,</p><br>
     <p style="white-space:pre-line;text-align:justify">${motivo}</p>
     ${monto>0?`<p style="font-weight:700;color:#c0392b;font-size:14px">Monto de la multa: $${monto.toLocaleString('es-CL')}</p>`:''}
-    <div style="margin-top:50px">
-      <p style="text-align:center;font-weight:700">COMITÉ ADMINISTRATIVO</p>
-      <p style="text-align:center;font-weight:700">Condominio LAS ARAUCARIAS</p>
-    </div>
-    <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:flex-end">
-      <div style="text-align:center"><img src="${FIRMA_B64}" style="height:80px;width:auto;display:block;margin:0 auto" alt="Firma">
-        <div style="border-top:1px solid #333;padding-top:6px;font-size:12px"><strong>Administrador/a: Elena Maturana</strong><br>Correo: adm.lasaraucarias2020@gmail.com<br>Teléfono: 56982187738</div>
+    <div style="margin-top:50px;text-align:center">
+      <img src="${TIMBRE_B64}" style="height:90px;width:auto;display:block;margin:0 auto 8px auto" alt="Timbre">
+      <div style="border-top:1px solid #333;width:260px;margin:0 auto;padding-top:8px">
+        <div style="font-weight:700;font-size:13px">COMITÉ DE ADMINISTRACIÓN</div>
+        <div style="font-size:12px;color:#555">Condominio Las Araucarias — La Cruz</div>
       </div>
-      <div><img src="${TIMBRE_B64}" style="height:80px;width:auto" alt="Timbre"></div>
     </div>
   </body></html>`;
   const v=window.open('','_blank');
