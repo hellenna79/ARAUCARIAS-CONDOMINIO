@@ -2655,10 +2655,10 @@ function renderTablaAcceso(docs) {
     const rankB = tb.includes('1') ? 0 : tb.includes('2') ? 1 : 2;
     return rankA - rankB;
   });
-  let html='<div style="overflow-x:auto"><table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>Teléfono</th><th>N° Posición</th><th>Acciones</th></tr></thead><tbody>';
+  let html='<div style="overflow-x:auto"><table><thead><tr><th>Unidad</th><th>Acceso</th><th>Nombre</th><th>N° Posición</th><th>Teléfono</th><th>Acciones</th></tr></thead><tbody>';
   docs.forEach(a => {
     const badgeColor = (a.tipo||'').includes('1') ? 'badge-verde' : (a.tipo||'').includes('2') ? 'badge-amarillo' : 'badge-gris';
-    html+=`<tr><td><strong>${a.unidad||'—'}</strong></td><td><span class="badge ${badgeColor}">${a.tipo||'—'}</span></td><td>${a.nombre||'—'}</td><td>${a.telefono||'—'}</td><td>${a.posicion||'—'}</td>
+    html+=`<tr><td><strong>${a.unidad||'—'}</strong></td><td><span class="badge ${badgeColor}">${a.tipo||'—'}</span></td><td>${a.nombre||'—'}</td><td>${a.posicion||'—'}</td><td>${a.telefono||'—'}</td>
       <td style="white-space:nowrap">
         <button onclick="abrirModalAcceso('${a.id}')" style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:4px">✏️</button>
         <button onclick="eliminarAcceso('${a.id}')" style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px">🗑️</button>
