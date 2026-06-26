@@ -3692,14 +3692,13 @@ function generarCartaAviso2(){
     <div class="cuerpo">${cuerpo}</div>
 
     <div class="firma">
-      <img src="${FIRMA_B64}" style="height:80px;width:auto;display:block;margin-bottom:4px" alt="Firma">
-      <div class="firma-linea">
-        <div class="firma-nombre">ELENA DEL CARMEN MATURANA TORO</div>
-        <div class="firma-cargo">Administradora — Condominio Las Araucarias</div>
+      <div style="text-align:center;margin-bottom:8px">
+        <img src="${TIMBRE_B64}" style="height:90px;width:auto" alt="Timbre">
       </div>
-    </div>
-    <div style="position:absolute;bottom:60px;right:60px">
-      <img src="${TIMBRE_B64}" style="height:80px;width:auto" alt="Timbre">
+      <div class="firma-linea" style="width:260px">
+        <div class="firma-nombre">COMITÉ DE ADMINISTRACIÓN</div>
+        <div class="firma-cargo">Condominio Las Araucarias — La Cruz</div>
+      </div>
     </div>
   </body></html>`;
   const v=window.open('','_blank');
