@@ -615,10 +615,16 @@ function guardarPago() {
     forma: document.getElementById('p-forma').value,
   };
   if (!datos.unidad || !datos.monto) { alert('Ingresa al menos la unidad y el monto'); return; }
+  // Actualizar abono en GASTOS_JUNIO_2026 DIRECTAMENTE (sin esperar Firestore)
+  const gInmediato = GASTOS_JUNIO_2026.find(x => x.unidad === String(datos.unidad));
+  if (gInmediato) {
+    gInmediato.abonos += datos.monto;
+    renderGastosTabla();
+  }
   db.collection('pagos').add(datos).then(ref => {
     cerrarModalPago();
     cargarPagos();
-    // Sincronizar abonos en gastos comunes automáticamente (incluye ajustes)
+    // Sincronizar también desde Firestore para asegurar consistencia
     sincronizarAbonosDesdeRecaudacion();
     // Generar asiento contable automático en libro diario
     if (datos.tipo !== 'Ajuste') {
@@ -751,14 +757,20 @@ function sincronizarAbonosDesdeRecaudacion() {
   // Cargar TODOS los pagos/ajustes registrados y acumular por unidad
   db.collection('pagos').get().then(snap => {
     GASTOS_JUNIO_2026.forEach(g => { g.abonos = 0; });
+    let totalDocs = 0;
     snap.forEach(doc => {
       const p = doc.data();
+      totalDocs++;
       if (!p.unidad || !p.monto) return;
       const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(p.unidad));
       if (g) g.abonos += Number(p.monto);
     });
     renderGastosTabla();
-  }).catch(() => {});
+    console.log('[Sincronizar] OK — ' + totalDocs + ' registros leídos desde Firestore');
+  }).catch(err => {
+    console.error('[Sincronizar] ERROR Firestore:', err);
+    alert('⚠️ Error al sincronizar con Firestore: ' + err.message);
+  });
 }
 
 function mostrarGastos() {
