@@ -840,56 +840,82 @@ function limpiarFiltroGastos() {
 function verHistorialUnidad(unidad) {
   const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
   if (!g) return;
-  // Eliminar historial anterior
   const anterior = document.getElementById('panel-historial');
   if (anterior) anterior.remove();
+
+  const saldoPendiente = Math.max(0, g.capitalAtrasado + g.totalMes + g.intereses - g.abonos);
+  const colorSaldo = saldoPendiente > 0 ? '#dc2626' : '#16a34a';
 
   const panel = document.createElement('div');
   panel.id = 'panel-historial';
   panel.style.cssText = 'background:white;border:1px solid var(--borde);border-radius:12px;padding:20px;margin-top:16px';
-  panel.innerHTML = \`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div>
-        <strong style="font-size:15px;color:var(--verde4)">Unidad \${unidad} — \${g.residente}</strong><br>
-        <span style="font-size:12px;color:#999">Historial de pagos</span>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-verde" style="font-size:12px" onclick="abrirModalNuevoPago('\${unidad}')">+ Registrar pago</button>
-        <button class="btn btn-outline" style="font-size:12px" onclick="document.getElementById('panel-historial').remove()">✖ Cerrar</button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;background:#f8fdf9;border-radius:8px;padding:12px">
-      <div><div style="font-size:11px;color:#999">Capital atrasado</div><strong style="color:#dc2626">$\${g.capitalAtrasado.toLocaleString('es-CL')}</strong></div>
-      <div><div style="font-size:11px;color:#999">Total mes</div><strong style="color:#1a7a4a">$\${g.totalMes.toLocaleString('es-CL')}</strong></div>
-      <div><div style="font-size:11px;color:#999">Total abonado</div><strong style="color:#16a34a">$\${g.abonos.toLocaleString('es-CL')}</strong></div>
-      <div><div style="font-size:11px;color:#999">Saldo pendiente</div><strong style="color:\${Math.max(0,g.capitalAtrasado+g.totalMes+g.intereses-g.abonos)>0?'#dc2626':'#16a34a'}">$\${Math.max(0,g.capitalAtrasado+g.totalMes+g.intereses-g.abonos).toLocaleString('es-CL')}</strong></div>
-    </div>
-    <div id="historial-unidad-\${unidad}"><div style="text-align:center;padding:20px;color:#999">Cargando historial...</div></div>
-  \`;
+
+  const headerDiv = document.createElement('div');
+  headerDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px';
+  headerDiv.innerHTML = '<div><strong style="font-size:15px;color:var(--verde4)">Unidad ' + unidad + ' \u2014 ' + g.residente + '</strong><br><span style="font-size:12px;color:#999">Historial de pagos</span></div>';
+  const botonesDiv = document.createElement('div');
+  botonesDiv.style.cssText = 'display:flex;gap:8px';
+  const btnPago = document.createElement('button');
+  btnPago.className = 'btn btn-verde';
+  btnPago.style.fontSize = '12px';
+  btnPago.textContent = '+ Registrar pago';
+  btnPago.onclick = function() { abrirModalNuevoPago(String(unidad)); };
+  const btnCerrar = document.createElement('button');
+  btnCerrar.className = 'btn btn-outline';
+  btnCerrar.style.fontSize = '12px';
+  btnCerrar.textContent = '\u2716 Cerrar';
+  btnCerrar.onclick = function() { document.getElementById('panel-historial').remove(); };
+  botonesDiv.appendChild(btnPago);
+  botonesDiv.appendChild(btnCerrar);
+  headerDiv.appendChild(botonesDiv);
+
+  const resumenDiv = document.createElement('div');
+  resumenDiv.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;background:#f8fdf9;border-radius:8px;padding:12px';
+  resumenDiv.innerHTML =
+    '<div><div style="font-size:11px;color:#999">Capital atrasado</div><strong style="color:#dc2626">$' + g.capitalAtrasado.toLocaleString('es-CL') + '</strong></div>' +
+    '<div><div style="font-size:11px;color:#999">Total mes</div><strong style="color:#1a7a4a">$' + g.totalMes.toLocaleString('es-CL') + '</strong></div>' +
+    '<div><div style="font-size:11px;color:#999">Total abonado</div><strong style="color:#16a34a">$' + g.abonos.toLocaleString('es-CL') + '</strong></div>' +
+    '<div><div style="font-size:11px;color:#999">Saldo pendiente</div><strong style="color:' + colorSaldo + '">$' + saldoPendiente.toLocaleString('es-CL') + '</strong></div>';
+
+  const histDiv = document.createElement('div');
+  histDiv.id = 'historial-unidad-' + unidad;
+  histDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#999">Cargando historial...</div>';
+
+  panel.appendChild(headerDiv);
+  panel.appendChild(resumenDiv);
+  panel.appendChild(histDiv);
   document.getElementById('content').appendChild(panel);
 
-  // Cargar historial desde Firestore
   db.collection('pagos').where('unidad','==',String(unidad)).orderBy('fecha','desc').get()
     .then(snap => {
       const div = document.getElementById('historial-unidad-' + unidad);
       if (!div) return;
-      if (snap.empty) { div.innerHTML = '<div style="padding:16px;color:#999;text-align:center">Sin pagos registrados para esta unidad</div>'; return; }
-      let html = '<table style="width:100%;font-size:13px"><thead><tr style="background:#e8f5ee"><th style="padding:8px;text-align:left">Fecha</th><th style="padding:8px;text-align:left">Concepto</th><th style="padding:8px;text-align:left">Forma</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Acciones</th></tr></thead><tbody>';
+      if (snap.empty) {
+        div.innerHTML = '<div style="padding:16px;color:#999;text-align:center">Sin pagos registrados para esta unidad</div>';
+        return;
+      }
+      let html = '<table style="width:100%;font-size:13px"><thead><tr style="background:#e8f5ee">' +
+        '<th style="padding:8px;text-align:left">Fecha</th>' +
+        '<th style="padding:8px;text-align:left">Concepto</th>' +
+        '<th style="padding:8px;text-align:left">Forma</th>' +
+        '<th style="padding:8px;text-align:right">Monto</th>' +
+        '<th style="padding:8px">Acciones</th>' +
+        '</tr></thead><tbody>';
       snap.forEach(doc => {
         const p = doc.data();
-        html += \`<tr style="border-bottom:1px solid #eee">
-          <td style="padding:8px">\${p.fecha||'—'}</td>
-          <td style="padding:8px">\${p.concepto||'—'}</td>
-          <td style="padding:8px"><span style="background:#e8f5ee;padding:2px 8px;border-radius:10px;font-size:11px">\${p.forma||'—'}</span></td>
-          <td style="padding:8px;text-align:right;color:#16a34a;font-weight:600">$\${Number(p.monto||0).toLocaleString('es-CL')}</td>
-          <td style="padding:8px;text-align:center"><button onclick="eliminarPagoGasto('\${doc.id}','\${unidad}',\${p.monto})" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px">✖</button></td>
-        </tr>\`;
+        html += '<tr style="border-bottom:1px solid #eee">' +
+          '<td style="padding:8px">' + (p.fecha||'—') + '</td>' +
+          '<td style="padding:8px">' + (p.concepto||'—') + '</td>' +
+          '<td style="padding:8px"><span style="background:#e8f5ee;padding:2px 8px;border-radius:10px;font-size:11px">' + (p.forma||'—') + '</span></td>' +
+          '<td style="padding:8px;text-align:right;color:#16a34a;font-weight:600">$' + Number(p.monto||0).toLocaleString('es-CL') + '</td>' +
+          '<td style="padding:8px;text-align:center"><button onclick="eliminarPagoGasto(\'' + doc.id + '\',\'' + unidad + '\',' + p.monto + ')" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px">\u2716</button></td>' +
+          '</tr>';
       });
       html += '</tbody></table>';
       div.innerHTML = html;
     }).catch(() => {
       const div = document.getElementById('historial-unidad-' + unidad);
-      if (div) div.innerHTML = '<div style="padding:16px;color:#999;text-align:center">Sin pagos registrados aún</div>';
+      if (div) div.innerHTML = '<div style="padding:16px;color:#999;text-align:center">Sin pagos registrados a\u00fan</div>';
     });
 }
 
