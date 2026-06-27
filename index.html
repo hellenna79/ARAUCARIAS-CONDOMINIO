@@ -921,7 +921,8 @@ function renderGastosTabla() {
     <td style="text-align:right;color:#16a34a">$${totSaldo.toLocaleString('es-CL')}</td>
     <td></td>
   </tr></tfoot></table></div>`;
-  document.getElementById('lista-gastos').innerHTML = html;
+  const listaGastos = document.getElementById('lista-gastos');
+  if (listaGastos) listaGastos.innerHTML = html;
 }
 
 function exportarGastosExcel() {
