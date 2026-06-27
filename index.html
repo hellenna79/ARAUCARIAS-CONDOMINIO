@@ -3927,8 +3927,27 @@ function eliminarCarta(id){
 function editarCarta(id){
   const carta=_todasRC.find(c=>c._id===id);
   if(!carta) return;
-  const nuevoTipo=prompt('Tipo de carta:',carta.tipo||'');
-  if(nuevoTipo===null) return;
+  const motivos=[
+    'Carta de Aviso — Ruidos molestos',
+    'Carta de Aviso — Estacionamiento indebido',
+    'Carta de Aviso — Tenencia responsable mascotas',
+    'Carta de Aviso — Incumplimiento reglamento',
+    'Carta de Aviso — Juegos espacios comunes',
+    'Carta de Aviso — Multa inasistencia asamblea',
+    'Carta de Aviso — Manejo inadecuado de basura',
+    'Carta de Aviso — Daños a bienes comunes',
+    'Carta de Aviso — Deuda gastos comunes',
+    'Notificación de Multa',
+    'Citación Asamblea',
+    'Verificación de Saldo',
+    'Liquidación Mensual'
+  ];
+  const opcs = motivos.map((m,i)=>`${i+1}. ${m}`).join('\n');
+  const sel = prompt('Selecciona el motivo (número):\n\n'+opcs+'\n\nO escribe el motivo directamente:', carta.tipo||'');
+  if(sel===null) return;
+  let nuevoTipo = sel.trim();
+  const num = parseInt(sel);
+  if(num>=1 && num<=motivos.length) nuevoTipo = motivos[num-1];
   const nuevaFecha=prompt('Fecha (YYYY-MM-DD):',carta.fecha||'');
   if(nuevaFecha===null) return;
   db.collection('registro_cartas').doc(id).update({
@@ -3946,8 +3965,11 @@ function guardarRegistroCarta(tipo){
   let tipoTexto;
   if(tipo==='aviso'){
     const sel=document.getElementById('ca-tipo');
+    const selVal=sel?sel.value:'';
     const selText=sel?sel.options[sel.selectedIndex]?.text:'';
-    tipoTexto=(!selText||selText.toLowerCase().includes('plantilla'))?'Carta de Aviso — Personalizada':'Carta de Aviso — '+selText;
+    const motLibre=document.getElementById('ca-motivo-libre')?.value?.trim()||'';
+    let motFinal = selVal==='otro' && motLibre ? motLibre : selText;
+    tipoTexto='Carta de Aviso — ' + (motFinal||'Aviso');
   } else if(tipo==='multa'){
     tipoTexto='Notificación de Multa';
   } else if(tipo==='asamblea'){
@@ -4054,8 +4076,12 @@ function abrirCartaAviso(){
               <option value="reglamento">Incumplimiento reglamento</option>
               <option value="juegos">Juegos espacios comunes</option>
               <option value="multa_inasistencia">Multa inasistencia asamblea</option>
-              <option value="personalizado">— Mi plantilla guardada —</option>
-            </select></div>
+              <option value="basura">Manejo inadecuado de basura</option>
+              <option value="daños">Daños a bienes comunes</option>
+              <option value="deuda">Deuda gastos comunes</option>
+              <option value="otro">Otro motivo (especificar abajo)</option>
+            </select>
+            <input id="ca-motivo-libre" placeholder="Describe el motivo (si elegiste Otro)" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;margin-top:6px;display:none"></div>
           <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Carta</label>
             <input id="ca-numero" type="number" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
         </div>
@@ -4124,7 +4150,9 @@ const _textosAviso = {
 function aplicarTextoAviso(tipo){
   const t=document.getElementById('ca-cuerpo');
   const selPlant=document.getElementById('selector-plantilla-aviso');
+  const campoLibre=document.getElementById('ca-motivo-libre');
   if(!t) return;
+  if(campoLibre) campoLibre.style.display = tipo==='otro' ? 'block' : 'none';
   if(tipo==='personalizado'){ if(selPlant) selPlant.style.display='block'; cargarSelectPlantillas(); }
   else { if(selPlant) selPlant.style.display='none'; t.value=_textosAviso[tipo]||''; }
 }
