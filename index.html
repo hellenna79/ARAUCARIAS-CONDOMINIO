@@ -618,8 +618,8 @@ function guardarPago() {
   db.collection('pagos').add(datos).then(ref => {
     cerrarModalPago();
     cargarPagos();
-    // Sincronizar abonos en gastos comunes automáticamente
-    if (datos.tipo !== 'Ajuste') sincronizarAbonosDesdeRecaudacion();
+    // Sincronizar abonos en gastos comunes automáticamente (incluye ajustes)
+    sincronizarAbonosDesdeRecaudacion();
     // Generar asiento contable automático en libro diario
     if (datos.tipo !== 'Ajuste') {
       const asiento = {
