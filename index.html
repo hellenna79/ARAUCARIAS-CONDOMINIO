@@ -555,17 +555,51 @@ function imprimirEstadoCuenta() {
   setTimeout(()=>v.print(),500);
 }
 
+let _todosPagos = [];
 function cargarPagos() {
   db.collection('pagos').orderBy('fecha','desc').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay pagos registrados</div>'; return; }
-    let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const p = d.data();
-      html += `<tr><td>${p.fecha||'—'}</td><td>${p.unidad||'—'}</td><td>${p.concepto||'—'}</td><td>$${Number(p.monto||0).toLocaleString('es-CL')}</td><td><span class="badge badge-gris">${p.forma||'—'}</span></td></tr>`;
+    _todosPagos = [];
+    snap.forEach(d => _todosPagos.push({id:d.id,...d.data()}));
+    let html = '<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Concepto</th><th>Monto</th><th>Forma pago</th><th>Acciones</th></tr></thead><tbody>';
+    _todosPagos.forEach(p => {
+      html += `<tr>
+        <td>${p.fecha||'—'}</td>
+        <td>${p.unidad||'—'}</td>
+        <td>${p.concepto||'—'}</td>
+        <td>$${Number(p.monto||0).toLocaleString('es-CL')}</td>
+        <td><span class="badge badge-gris">${p.forma||'—'}</span></td>
+        <td style="white-space:nowrap">
+          <button onclick="editarPago('${p.id}')" style="background:#1a5276;color:white;border:none;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px;margin-right:4px">✏️</button>
+          <button onclick="eliminarPago('${p.id}')" style="background:#c0392b;color:white;border:none;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px">🗑️</button>
+        </td>
+      </tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('lista-pagos').innerHTML = html;
   }).catch(() => { document.getElementById('lista-pagos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Sin pagos registrados aún</div>'; });
+}
+function eliminarPago(id){
+  if(!confirm('¿Eliminar este pago? Se revertirá la sincronización con gastos comunes.')) return;
+  db.collection('pagos').doc(id).delete()
+    .then(()=>{ cargarPagos(); sincronizarAbonosDesdeRecaudacion(); })
+    .catch(e=>alert('Error al eliminar: '+e.message));
+}
+function editarPago(id){
+  const p = _todosPagos.find(x=>x.id===id);
+  if(!p) return;
+  const nuevoMonto = prompt('Monto ($):', p.monto||0);
+  if(nuevoMonto===null) return;
+  const nuevoConcepto = prompt('Concepto:', p.concepto||'');
+  if(nuevoConcepto===null) return;
+  const nuevaFecha = prompt('Fecha (YYYY-MM-DD):', p.fecha||'');
+  if(nuevaFecha===null) return;
+  db.collection('pagos').doc(id).update({
+    monto: Number(nuevoMonto)||p.monto,
+    concepto: nuevoConcepto.trim()||p.concepto,
+    fecha: nuevaFecha.trim()||p.fecha,
+  }).then(()=>{ cargarPagos(); sincronizarAbonosDesdeRecaudacion(); })
+    .catch(e=>alert('Error al editar: '+e.message));
 }
 
 function abrirModalPago() { document.getElementById('modal-pago').style.display = 'flex'; document.getElementById('p-fecha').value=new Date().toISOString().split('T')[0]; }
@@ -3634,14 +3668,41 @@ function renderRC(cartas){
         <span style="float:right;font-weight:400;font-size:12px">${pu[u].length} carta(s)</span>
       </div>
       <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:#f4f6f4"><th style="padding:8px 12px;font-size:12px;text-align:left">N° Carta</th><th style="padding:8px 12px;font-size:12px;text-align:left">Tipo</th><th style="padding:8px 12px;font-size:12px;text-align:left">Fecha</th></tr></thead>
+        <thead><tr style="background:#f4f6f4">
+          <th style="padding:8px 12px;font-size:12px;text-align:left">N° Carta</th>
+          <th style="padding:8px 12px;font-size:12px;text-align:left">Tipo</th>
+          <th style="padding:8px 12px;font-size:12px;text-align:left">Fecha</th>
+          <th style="padding:8px 12px;font-size:12px;text-align:left">Acciones</th>
+        </tr></thead>
         <tbody>${pu[u].sort((a,b)=>(a.numero||0)-(b.numero||0)).map((ct,i)=>`<tr style="background:${i%2?'#f9f9f9':'white'}">
           <td style="padding:8px 12px;font-size:13px">N°${ct.numero||'—'}</td>
           <td style="padding:8px 12px;font-size:13px">${ct.tipo||'—'}</td>
           <td style="padding:8px 12px;font-size:13px">${ct.fecha||'—'}</td>
+          <td style="padding:8px 12px;white-space:nowrap">
+            <button onclick="editarCarta('${ct._id}')" style="background:#1a5276;color:white;border:none;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px;margin-right:4px">✏️ Editar</button>
+            <button onclick="eliminarCarta('${ct._id}')" style="background:#c0392b;color:white;border:none;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px">🗑️ Eliminar</button>
+          </td>
         </tr>`).join('')}</tbody>
       </table>
     </div>`).join('');
+}
+function eliminarCarta(id){
+  if(!confirm('¿Eliminar esta carta del registro?')) return;
+  db.collection('registro_cartas').doc(id).delete()
+    .then(()=>cargarRC())
+    .catch(e=>alert('Error: '+e.message));
+}
+function editarCarta(id){
+  const carta=_todasRC.find(c=>c._id===id);
+  if(!carta) return;
+  const nuevoTipo=prompt('Tipo de carta:',carta.tipo||'');
+  if(nuevoTipo===null) return;
+  const nuevaFecha=prompt('Fecha (YYYY-MM-DD):',carta.fecha||'');
+  if(nuevaFecha===null) return;
+  db.collection('registro_cartas').doc(id).update({
+    tipo:nuevoTipo.trim()||carta.tipo,
+    fecha:nuevaFecha.trim()||carta.fecha,
+  }).then(()=>cargarRC()).catch(e=>alert('Error: '+e.message));
 }
 function guardarRegistroCarta(tipo){
   const uId=tipo==='aviso'?'ca-unidad':tipo==='asamblea'?'asm-unidad':'nm-unidad';
