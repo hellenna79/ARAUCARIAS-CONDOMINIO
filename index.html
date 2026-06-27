@@ -748,8 +748,8 @@ function cerrarMesGastos() {
 }
 
 function sincronizarAbonosDesdeRecaudacion() {
-  const mesKey = '2026-06';
-  db.collection('pagos').where('fecha','>=', mesKey+'-01').where('fecha','<=', mesKey+'-30').get().then(snap => {
+  // Cargar TODOS los pagos/ajustes registrados y acumular por unidad
+  db.collection('pagos').get().then(snap => {
     GASTOS_JULIO_2026.forEach(g => { g.abonos = 0; });
     snap.forEach(doc => {
       const p = doc.data();
@@ -837,7 +837,8 @@ function mostrarGastos() {
         </div>
       </div>
     </div>`;
-  renderGastosTabla();
+  // Auto-sincronizar abonos desde Firestore al abrir el módulo
+  sincronizarAbonosDesdeRecaudacion();
 }
 
 function editarGasto(idx) {
