@@ -1281,78 +1281,58 @@ function procesarImportEgreso(input) {
   if (!input.files[0]) return;
   const file = input.files[0];
   const ext = file.name.split('.').pop().toLowerCase();
+  input.value = '';
+
+  function parseMonto(str) {
+    if (!str) return 0;
+    const clean = String(str).replace(/[$\s]/g,'').replace(/\./g,'').replace(',','.');
+    return parseFloat(clean) || 0;
+  }
+
+  function parseFecha(str) {
+    str = (str||'').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+      const y = m[3].length === 2 ? '20'+m[3] : m[3];
+      return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    }
+    return str;
+  }
 
   function procesarFilas(filas) {
-    const lines = filas.map(row => row.map(c => String(c===null||c===undefined?'':c)));
-    if (!lines.length) { alert('El archivo está vacío.'); return; }
-    if (!lines.length) { alert('El archivo está vacío.'); return; }
+    if (!filas || !filas.length) { alert('El archivo está vacío.'); return; }
 
-    // Para xlsx las filas ya vienen parseadas; para CSV parsear
-    function parseLine(line) {
-      if (Array.isArray(line)) return line;
-      const countSemi = (line.match(/;/g)||[]).length;
-      const countComma = (line.match(/,/g)||[]).length;
-      const sep = countSemi >= countComma ? ';' : ',';
-      const cols = []; let cur = ''; let inQ = false;
-      for (const ch of line) {
-        if (ch === '"') inQ=!inQ;
-        else if (ch === sep && !inQ) { cols.push(cur.trim().replace(/^"+|"+$/g,'')); cur=''; }
-        else cur+=ch;
-      }
-      cols.push(cur.trim().replace(/^"+|"+$/g,''));
-      return cols;
-    }
-
-    // Detectar fila de encabezado buscando palabras clave
+    // Detectar fila de encabezado
     let startRow = 0;
-    for (let i = 0; i < Math.min(lines.length, 10); i++) {
-      const row = parseLine(lines[i]);
+    for (let i = 0; i < Math.min(filas.length, 10); i++) {
+      const row = filas[i].map(c => String(c||''));
       if (row.some(c => /fecha/i.test(c) || /descripci/i.test(c) || /monto/i.test(c) || /proveedor/i.test(c))) {
         startRow = i + 1; break;
       }
     }
 
-    // Parsear monto chileno: "$ 99.157" o "$99.157" o "99157" → 99157
-    function parseMonto(str) {
-      if (!str) return 0;
-      const clean = str.replace(/[$\s]/g,'').replace(/\./g,'').replace(',','.');
-      return parseFloat(clean) || 0;
-    }
-
-    // Parsear fecha: dd/mm/yyyy, dd-mm-yyyy, d/m/yyyy → yyyy-mm-dd
-    function parseFecha(str) {
-      str = (str||'').trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-      const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-      if (m) {
-        const y = m[3].length === 2 ? '20'+m[3] : m[3];
-        return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-      }
-      return '';
-    }
-
-    const errores = []; let importados = 0;
     const batch = db.batch();
+    let importados = 0;
+    const errores = [];
 
-    for (let i = startRow; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-      const cols = parseLine(lines[i]);
-      // Columnas: Proveedor(0), Rut(1), Fecha(2), Descripción(3), Categoría(4), Período(5), Monto(6), Estado(7), Forma(8)
-      const fecha = parseFecha(cols[2]);
+    for (let i = startRow; i < filas.length; i++) {
+      const cols = filas[i].map(c => String(c===null||c===undefined?'':c).trim());
+      if (cols.every(c => !c)) continue;
       const monto = parseMonto(cols[6]);
-      if (!fecha) { errores.push('Fila '+(i+1)+': fecha inválida ("'+(cols[2]||'vacía')+'")'); continue; }
-      if (!monto) { errores.push('Fila '+(i+1)+': monto inválido ("'+(cols[6]||'vacío')+'")'); continue; }
+      const fecha = parseFecha(cols[2]);
+      if (!fecha || monto <= 0) { errores.push('Fila '+(i+1)+': fecha o monto inválido'); continue; }
       const ref = db.collection('egresos').doc();
       batch.set(ref, {
-        proveedor: cols[0]||'',
+        proveedor: cols[0]||'—',
         rut: cols[1]||'',
-        fecha,
+        fecha: fecha,
         descripcion: cols[3]||'',
-        categoria: cols[4]||'Otro',
+        categoria: cols[4]||'',
         periodo: cols[5]||'',
-        monto,
-        estado: cols[7]||'Pagado',
-        forma: cols[8]||'Transferencia',
+        monto: monto,
+        estado: cols[7]||'Pendiente',
+        tipoDoc: cols[8]||'Transferencia',
         importado: true,
         fechaImport: new Date().toISOString()
       });
@@ -1361,21 +1341,50 @@ function procesarImportEgreso(input) {
 
     if (importados === 0) {
       let msg = '⚠️ No se pudo importar ningún egreso.\n\n';
-      msg += 'Verifica que:\n• El archivo sea CSV (.csv)\n• Las columnas sean: Proveedor | Rut | Fecha | Descripción | Categoría | Período | Monto | Estado | Tipo doc.\n\n';
-      if (errores.length) msg += 'Errores encontrados:\n' + errores.slice(0,5).join('\n');
-      alert(msg);
-      return;
+      msg += 'Columnas esperadas: Proveedor | Rut | Fecha | Descripción | Categoría | Período | Monto | Estado | Tipo doc.\n';
+      if (errores.length) msg += '\nErrores: ' + errores.slice(0,5).join(' / ');
+      alert(msg); return;
     }
 
     batch.commit().then(() => {
       let msg = '✅ Importación completada: ' + importados + ' egresos cargados.';
-      if (errores.length) msg += '\n⚠️ ' + errores.length + ' filas con error (omitidas).';
+      if (errores.length) msg += '\n⚠️ ' + errores.length + ' filas omitidas.';
       alert(msg);
       cargarEgresos();
     }).catch(e => alert('Error al guardar: ' + e.message));
-  };
-  reader.readAsText(file, 'UTF-8');
-  input.value = '';
+  }
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const filas = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        procesarFilas(filas);
+      } catch(e) { alert('No se pudo leer el archivo Excel: ' + e.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const text = ev.target.result;
+      const lineas = text.split(/\r?\n/).filter(l => l.trim());
+      const sep = (lineas[0]||'').includes(';') ? ';' : ',';
+      const filas = lineas.map(l => {
+        const cols = []; let cur = ''; let inQ = false;
+        for (const ch of l) {
+          if (ch === '"') inQ=!inQ;
+          else if (ch === sep && !inQ) { cols.push(cur.trim().replace(/^"+|"+$/g,'')); cur=''; }
+          else cur+=ch;
+        }
+        cols.push(cur.trim().replace(/^"+|"+$/g,''));
+        return cols;
+      });
+      procesarFilas(filas);
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
 }
 
 function verEgreso(id, datos) {
