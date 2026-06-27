@@ -272,29 +272,39 @@ function mostrarPanel() {
       <div class="card"><div class="card-icon">🏠</div><div class="card-valor" id="total-unidades">—</div><div class="card-label">Unidades totales</div></div>
       <div class="card"><div class="card-icon">⚠️</div><div class="card-valor" id="unidades-mora">—</div><div class="card-label">En mora</div></div>
       <div class="card"><div class="card-icon">💰</div><div class="card-valor" id="monto-pendiente">—</div><div class="card-label">Deuda total</div></div>
-      <div class="card"><div class="card-icon">✅</div><div class="card-valor" id="pagados-mes">—</div><div class="card-label">Pagados este mes</div></div>
+      <div class="card"><div class="card-icon">✅</div><div class="card-valor" id="pagados-mes">—</div><div class="card-label">Total abonado mes</div></div>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Últimos movimientos</h3></div>
       <div id="ultimos-movimientos"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
     </div>`;
   
-  db.collection('residentes').get().then(snap => {
-    document.getElementById('total-unidades').textContent = snap.size;
-    let mora = 0, deuda = 0, pagados = 0;
-    snap.forEach(d => {
-      const r = d.data();
-      if (r.saldo && r.saldo < 0) { mora++; deuda += Math.abs(r.saldo); }
-      if (r.pagadoMes) pagados++;
+  // Calcular estadísticas desde GASTOS_JUNIO_2026 en tiempo real
+  function actualizarTarjetasPanel() {
+    const total = GASTOS_JUNIO_2026.length;
+    let mora = 0, deudaTotal = 0, totalAbonado = 0;
+    GASTOS_JUNIO_2026.forEach(g => {
+      const saldo = Math.max(0, g.capitalAtrasado + g.totalMes + g.intereses - g.abonos);
+      if (saldo > 0) { mora++; deudaTotal += saldo; }
+      totalAbonado += g.abonos;
     });
+    document.getElementById('total-unidades').textContent = total;
     document.getElementById('unidades-mora').textContent = mora;
-    document.getElementById('monto-pendiente').textContent = '$' + deuda.toLocaleString('es-CL');
-    document.getElementById('pagados-mes').textContent = pagados;
+    document.getElementById('monto-pendiente').textContent = '$' + deudaTotal.toLocaleString('es-CL');
+    document.getElementById('pagados-mes').textContent = '$' + totalAbonado.toLocaleString('es-CL');
+  }
+  // Sincronizar abonos desde Firestore y luego actualizar panel
+  db.collection('pagos').get().then(snap => {
+    GASTOS_JUNIO_2026.forEach(g => { g.abonos = 0; });
+    snap.forEach(doc => {
+      const p = doc.data();
+      if (!p.unidad || !p.monto) return;
+      const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(p.unidad));
+      if (g) g.abonos += Number(p.monto);
+    });
+    actualizarTarjetasPanel();
   }).catch(() => {
-    document.getElementById('total-unidades').textContent = '75';
-    document.getElementById('unidades-mora').textContent = '—';
-    document.getElementById('monto-pendiente').textContent = '—';
-    document.getElementById('pagados-mes').textContent = '—';
+    actualizarTarjetasPanel();
   });
 
   db.collection('movimientos').orderBy('fecha','desc').limit(10).get().then(snap => {
