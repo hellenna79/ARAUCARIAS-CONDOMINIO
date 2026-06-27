@@ -3644,14 +3644,27 @@ function renderRC(cartas){
     </div>`).join('');
 }
 function guardarRegistroCarta(tipo){
-  const uId=tipo==='aviso'?'ca-unidad':'nm-unidad';
-  const nId=tipo==='aviso'?'ca-numero':'nm-numero';
-  const nombId=tipo==='aviso'?'ca-nombre':'nm-nombre';
-  const tipoEl=tipo==='aviso'?document.getElementById('ca-tipo'):null;
+  const uId=tipo==='aviso'?'ca-unidad':tipo==='asamblea'?'asm-unidad':'nm-unidad';
+  const nId=tipo==='aviso'?'ca-numero':tipo==='asamblea'?'asm-numero':'nm-numero';
+  const nombId=tipo==='aviso'?'ca-nombre':tipo==='asamblea'?'asm-nombre':'nm-nombre';
   const unidad=document.getElementById(uId)?.value||'';
   const num=parseInt(document.getElementById(nId)?.value||1);
   const nombre=document.getElementById(nombId)?.value||'';
-  const tipoTexto=tipoEl?tipoEl.options[tipoEl.selectedIndex]?.text:'Notificación Multa';
+  let tipoTexto;
+  if(tipo==='aviso'){
+    const sel=document.getElementById('ca-tipo');
+    const selText=sel?sel.options[sel.selectedIndex]?.text:'';
+    tipoTexto=(!selText||selText.toLowerCase().includes('plantilla'))?'Carta de Aviso — Personalizada':'Carta de Aviso — '+selText;
+  } else if(tipo==='multa'){
+    tipoTexto='Notificación de Multa';
+  } else if(tipo==='asamblea'){
+    const tipoAsm=document.getElementById('asm-tipo')?.value||'';
+    tipoTexto='Citación Asamblea'+(tipoAsm?' — '+tipoAsm:'');
+  } else if(tipo==='saldo'){
+    tipoTexto='Verificación de Saldo';
+  } else {
+    tipoTexto=tipo||'Carta';
+  }
   db.collection('registro_cartas').add({unidad,nombre,tipo:tipoTexto,numero:num,fecha:new Date().toISOString().split('T')[0],fechaCompleta:new Date().toISOString()})
     .then(()=>alert('✅ Carta registrada')).catch(()=>alert('✅ Carta registrada'));
 }
