@@ -649,7 +649,7 @@ function calcularTotalCobrado(g) {
   return Math.max(0, bruto);
 }
 
-const GASTOS_JULIO_2026 = [
+const GASTOS_JUNIO_2026 = [
   {unidad:'1',residente:'Viviana Navarro',prorrateo:22000,totalMes:0,capitalAtrasado:33000,intereses:0,abonos:0,saldoFavor:0},
   {unidad:'2',residente:'Elena Maturana Toro Maturana',prorrateo:22000,totalMes:0,capitalAtrasado:44000,intereses:0,abonos:0,saldoFavor:0},
   {unidad:'3',residente:'Paola Alejandra Manzano Villalón',prorrateo:22000,totalMes:0,capitalAtrasado:44000,intereses:0,abonos:0,saldoFavor:0},
@@ -732,7 +732,7 @@ function cerrarMesGastos() {
   if (!confirm('¿Confirmas el cierre del mes ' + MES_ACTUAL + '?\n\nEsto cargará el gasto común mensual y calculará los intereses sobre el capital atrasado.')) return;
   const TASA_DIARIA = 0.001173;
   const DIAS = 30;
-  GASTOS_JULIO_2026.forEach(g => {
+  GASTOS_JUNIO_2026.forEach(g => {
     g.totalMes = g.prorrateo;
     if (g.capitalAtrasado > 0) {
       const intMes = Math.round(g.capitalAtrasado * TASA_DIARIA * DIAS);
@@ -750,11 +750,11 @@ function cerrarMesGastos() {
 function sincronizarAbonosDesdeRecaudacion() {
   // Cargar TODOS los pagos/ajustes registrados y acumular por unidad
   db.collection('pagos').get().then(snap => {
-    GASTOS_JULIO_2026.forEach(g => { g.abonos = 0; });
+    GASTOS_JUNIO_2026.forEach(g => { g.abonos = 0; });
     snap.forEach(doc => {
       const p = doc.data();
       if (!p.unidad || !p.monto) return;
-      const g = GASTOS_JULIO_2026.find(x => x.unidad === String(p.unidad));
+      const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(p.unidad));
       if (g) g.abonos += Number(p.monto);
     });
     renderGastosTabla();
@@ -842,7 +842,7 @@ function mostrarGastos() {
 }
 
 function editarGasto(idx) {
-  const g = GASTOS_JULIO_2026[idx];
+  const g = GASTOS_JUNIO_2026[idx];
   document.getElementById('eg-idx').value = idx;
   document.getElementById('eg-unidad').textContent = 'Unidad ' + g.unidad + ' — ' + g.residente;
   document.getElementById('eg-prorrateo').value = g.prorrateo;
@@ -856,7 +856,7 @@ function editarGasto(idx) {
 
 function guardarEdicionGasto() {
   const idx = parseInt(document.getElementById('eg-idx').value);
-  const g = GASTOS_JULIO_2026[idx];
+  const g = GASTOS_JUNIO_2026[idx];
   g.prorrateo       = Number(document.getElementById('eg-prorrateo').value) || 0;
   g.totalMes        = Number(document.getElementById('eg-totalMes').value) || 0;
   g.capitalAtrasado = Number(document.getElementById('eg-capitalAtrasado').value) || 0;
@@ -872,13 +872,13 @@ function cerrarModalEditarGasto() {
 }
 
 function renderGastosTabla() {
-  const gastosOrdenados = [...GASTOS_JULIO_2026].sort((a, b) => Number(a.unidad) - Number(b.unidad));
+  const gastosOrdenados = [...GASTOS_JUNIO_2026].sort((a, b) => Number(a.unidad) - Number(b.unidad));
   let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
     <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th></th>
   </tr></thead><tbody>`;
   let totProrrateo=0, totTotalMes=0, totCapital=0, totIntereses=0, totAbonos=0, totCobrado=0, totSaldo=0;
   gastosOrdenados.forEach(g => {
-    const idx = GASTOS_JULIO_2026.indexOf(g);
+    const idx = GASTOS_JUNIO_2026.indexOf(g);
     // Total cobrado = Capital Atrasado + Total Mes + Intereses - Abonos
     const totalCobrado = Math.max(0, g.capitalAtrasado + g.totalMes + g.intereses - g.abonos);
     const deudaTotal = g.capitalAtrasado + g.totalMes + g.intereses;
@@ -914,7 +914,7 @@ function renderGastosTabla() {
 
 function exportarGastosExcel() {
   let csv = 'Unidad,Residente,Prorrateo,GC Egresos,Total Mes,Capital Atrasado,Intereses,Abonos,Total Cobrado,Saldo Favor\n';
-  GASTOS_JULIO_2026.forEach(g => {
+  GASTOS_JUNIO_2026.forEach(g => {
     csv += `${g.unidad},"${g.residente}",${g.prorrateo},${g.gcEgresos},${g.totalMes},${g.capitalAtrasado},${g.intereses},${g.abonos},${g.totalCobrado},${g.saldoFavor}\n`;
   });
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
