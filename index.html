@@ -1303,12 +1303,26 @@ function procesarImportEgreso(input) {
   function procesarFilas(filas) {
     if (!filas || !filas.length) { alert('El archivo está vacío.'); return; }
 
-    // Detectar fila de encabezado
+    // Detectar fila de encabezado y mapear columnas dinámicamente
     let startRow = 0;
+    let colMap = {proveedor:0, rut:1, fecha:2, descripcion:3, categoria:3, periodo:4, monto:5, estado:6, tipoDoc:7};
     for (let i = 0; i < Math.min(filas.length, 10); i++) {
-      const row = filas[i].map(c => String(c||''));
-      if (row.some(c => /fecha/i.test(c) || /descripci/i.test(c) || /monto/i.test(c) || /proveedor/i.test(c))) {
-        startRow = i + 1; break;
+      const row = filas[i].map(c => String(c||'').toLowerCase());
+      if (row.some(c => /fecha/.test(c) || /monto/.test(c) || /proveedor/.test(c))) {
+        startRow = i + 1;
+        // Mapear columnas según encabezados reales
+        row.forEach((h, idx) => {
+          if (/proveedor/.test(h)) colMap.proveedor = idx;
+          else if (/rut/.test(h)) colMap.rut = idx;
+          else if (/fecha/.test(h)) colMap.fecha = idx;
+          else if (/descripci/.test(h)) colMap.descripcion = idx;
+          else if (/categor/.test(h)) colMap.categoria = idx;
+          else if (/per.odo|periodo/.test(h)) colMap.periodo = idx;
+          else if (/monto/.test(h)) colMap.monto = idx;
+          else if (/estado/.test(h)) colMap.estado = idx;
+          else if (/tipo|doc/.test(h)) colMap.tipoDoc = idx;
+        });
+        break;
       }
     }
 
@@ -1319,20 +1333,20 @@ function procesarImportEgreso(input) {
     for (let i = startRow; i < filas.length; i++) {
       const cols = filas[i].map(c => String(c===null||c===undefined?'':c).trim());
       if (cols.every(c => !c)) continue;
-      const monto = parseMonto(cols[6]);
-      const fecha = parseFecha(cols[2]);
+      const monto = parseMonto(cols[colMap.monto]);
+      const fecha = parseFecha(cols[colMap.fecha]);
       if (!fecha || monto <= 0) { errores.push('Fila '+(i+1)+': fecha o monto inválido'); continue; }
       const ref = db.collection('egresos').doc();
       batch.set(ref, {
-        proveedor: cols[0]||'—',
-        rut: cols[1]||'',
+        proveedor: cols[colMap.proveedor]||'—',
+        rut: cols[colMap.rut]||'',
         fecha: fecha,
-        descripcion: cols[3]||'',
-        categoria: cols[4]||'',
-        periodo: cols[5]||'',
+        descripcion: cols[colMap.descripcion]||'',
+        categoria: cols[colMap.categoria]||'',
+        periodo: cols[colMap.periodo]||'',
         monto: monto,
-        estado: cols[7]||'Pendiente',
-        tipoDoc: cols[8]||'Transferencia',
+        estado: cols[colMap.estado]||'Pagado',
+        tipoDoc: cols[colMap.tipoDoc]||'Transferencia',
         importado: true,
         fechaImport: new Date().toISOString()
       });
