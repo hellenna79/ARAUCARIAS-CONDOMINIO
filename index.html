@@ -3754,10 +3754,18 @@ function cargarConciliacion2() {
   const inicio = `${anio}-${mm}-01`;
   const fin = `${anio}-${mm}-31`;
 
+  const mesKey = `${anio}-${mes}`;
   Promise.all([
     db.collection('pagos').orderBy('fecha','asc').get(),
-    db.collection('egresos').orderBy('fecha','asc').get()
-  ]).then(([pSnap, eSnap]) => {
+    db.collection('egresos').orderBy('fecha','asc').get(),
+    db.collection('conciliacion_config').doc(mesKey).get()
+  ]).then(([pSnap, eSnap, cfgSnap]) => {
+    const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+    const saldoIniB = Number(cfg.saldoBanco||0);
+    const saldoIniC = Number(cfg.saldoCaja||0);
+    // Mostrar en los inputs
+    if(document.getElementById('saldo-ini-banco')) document.getElementById('saldo-ini-banco').value = saldoIniB||'';
+    if(document.getElementById('saldo-ini-caja')) document.getElementById('saldo-ini-caja').value = saldoIniC||'';
     const esBanco = f => ['Transferencia','Débito','débito','transferencia'].includes(f);
     let banco=[], caja=[], ingB=0, ingC=0, egrB=0, egrC=0;
 
@@ -3799,6 +3807,9 @@ function cargarConciliacion2() {
       return saldo;
     }
 
+    // Agregar saldo inicial como primera fila
+    if(saldoIniB>0) banco.unshift({f:'Saldo inicial',desc:'Saldo inicial período',ing:saldoIniB,egr:0});
+    if(saldoIniC>0) caja.unshift({f:'Saldo inicial',desc:'Saldo inicial período',ing:saldoIniC,egr:0});
     const sB=renderT(banco,'tbody-banco','total-banco');
     const sC=renderT(caja,'tbody-caja','total-caja');
 
