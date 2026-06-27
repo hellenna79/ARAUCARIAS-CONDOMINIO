@@ -773,19 +773,154 @@ function sincronizarAbonosDesdeRecaudacion() {
   });
 }
 
+// ===== NUEVO PAGO DIRECTO EN GASTOS COMUNES =====
+function abrirModalNuevoPago(unidadPresel) {
+  const unidadInput = document.getElementById('np-unidad');
+  if (unidadPresel) unidadInput.value = unidadPresel;
+  document.getElementById('np-monto').value = '';
+  document.getElementById('np-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('np-concepto').value = '';
+  document.getElementById('np-forma').value = 'Transferencia';
+  document.getElementById('modal-nuevo-pago').style.display = 'flex';
+}
+function cerrarModalNuevoPago() {
+  document.getElementById('modal-nuevo-pago').style.display = 'none';
+}
+function guardarNuevoPago() {
+  const unidad = document.getElementById('np-unidad').value.trim();
+  const monto = Number(document.getElementById('np-monto').value);
+  const fecha = document.getElementById('np-fecha').value;
+  const concepto = document.getElementById('np-concepto').value || 'Abono gasto común';
+  const forma = document.getElementById('np-forma').value;
+  if (!unidad || !monto) { alert('Ingresa unidad y monto'); return; }
+
+  // 1. Actualizar GASTOS_JUNIO_2026 directamente
+  const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
+  if (!g) { alert('Unidad ' + unidad + ' no encontrada'); return; }
+  g.abonos += monto;
+
+  // 2. Guardar en Firestore
+  const datos = { unidad, monto, fecha, concepto, forma, tipo: 'Pago' };
+  db.collection('pagos').add(datos).then(() => {
+    cerrarModalNuevoPago();
+    renderGastosTabla();
+    // Mostrar historial si está abierto
+    const hist = document.getElementById('historial-unidad-' + unidad);
+    if (hist) verHistorialUnidad(unidad);
+    alert('✅ Pago registrado — Unidad ' + unidad + ': $' + monto.toLocaleString('es-CL'));
+  }).catch(e => {
+    // Aunque falle Firestore, el abono ya está en la tabla
+    cerrarModalNuevoPago();
+    renderGastosTabla();
+    console.warn('Firestore falló pero abono aplicado localmente:', e);
+  });
+}
+
+// ===== FILTRO POR UNIDAD =====
+let _filtroUnidad = null;
+function filtrarGastos() {
+  const val = document.getElementById('buscar-unidad').value.trim();
+  _filtroUnidad = val || null;
+  renderGastosTabla();
+  if (val) {
+    const g = GASTOS_JUNIO_2026.find(x => x.unidad === val);
+    if (g) verHistorialUnidad(val);
+    else alert('Unidad ' + val + ' no encontrada');
+  }
+}
+function limpiarFiltroGastos() {
+  _filtroUnidad = null;
+  document.getElementById('buscar-unidad').value = '';
+  renderGastosTabla();
+  const h = document.getElementById('panel-historial');
+  if (h) h.remove();
+}
+
+// ===== HISTORIAL POR UNIDAD =====
+function verHistorialUnidad(unidad) {
+  const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
+  if (!g) return;
+  // Eliminar historial anterior
+  const anterior = document.getElementById('panel-historial');
+  if (anterior) anterior.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'panel-historial';
+  panel.style.cssText = 'background:white;border:1px solid var(--borde);border-radius:12px;padding:20px;margin-top:16px';
+  panel.innerHTML = \`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <strong style="font-size:15px;color:var(--verde4)">Unidad \${unidad} — \${g.residente}</strong><br>
+        <span style="font-size:12px;color:#999">Historial de pagos</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-verde" style="font-size:12px" onclick="abrirModalNuevoPago('\${unidad}')">+ Registrar pago</button>
+        <button class="btn btn-outline" style="font-size:12px" onclick="document.getElementById('panel-historial').remove()">✖ Cerrar</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;background:#f8fdf9;border-radius:8px;padding:12px">
+      <div><div style="font-size:11px;color:#999">Capital atrasado</div><strong style="color:#dc2626">$\${g.capitalAtrasado.toLocaleString('es-CL')}</strong></div>
+      <div><div style="font-size:11px;color:#999">Total mes</div><strong style="color:#1a7a4a">$\${g.totalMes.toLocaleString('es-CL')}</strong></div>
+      <div><div style="font-size:11px;color:#999">Total abonado</div><strong style="color:#16a34a">$\${g.abonos.toLocaleString('es-CL')}</strong></div>
+      <div><div style="font-size:11px;color:#999">Saldo pendiente</div><strong style="color:\${Math.max(0,g.capitalAtrasado+g.totalMes+g.intereses-g.abonos)>0?'#dc2626':'#16a34a'}">$\${Math.max(0,g.capitalAtrasado+g.totalMes+g.intereses-g.abonos).toLocaleString('es-CL')}</strong></div>
+    </div>
+    <div id="historial-unidad-\${unidad}"><div style="text-align:center;padding:20px;color:#999">Cargando historial...</div></div>
+  \`;
+  document.getElementById('content').appendChild(panel);
+
+  // Cargar historial desde Firestore
+  db.collection('pagos').where('unidad','==',String(unidad)).orderBy('fecha','desc').get()
+    .then(snap => {
+      const div = document.getElementById('historial-unidad-' + unidad);
+      if (!div) return;
+      if (snap.empty) { div.innerHTML = '<div style="padding:16px;color:#999;text-align:center">Sin pagos registrados para esta unidad</div>'; return; }
+      let html = '<table style="width:100%;font-size:13px"><thead><tr style="background:#e8f5ee"><th style="padding:8px;text-align:left">Fecha</th><th style="padding:8px;text-align:left">Concepto</th><th style="padding:8px;text-align:left">Forma</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Acciones</th></tr></thead><tbody>';
+      snap.forEach(doc => {
+        const p = doc.data();
+        html += \`<tr style="border-bottom:1px solid #eee">
+          <td style="padding:8px">\${p.fecha||'—'}</td>
+          <td style="padding:8px">\${p.concepto||'—'}</td>
+          <td style="padding:8px"><span style="background:#e8f5ee;padding:2px 8px;border-radius:10px;font-size:11px">\${p.forma||'—'}</span></td>
+          <td style="padding:8px;text-align:right;color:#16a34a;font-weight:600">$\${Number(p.monto||0).toLocaleString('es-CL')}</td>
+          <td style="padding:8px;text-align:center"><button onclick="eliminarPagoGasto('\${doc.id}','\${unidad}',\${p.monto})" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px">✖</button></td>
+        </tr>\`;
+      });
+      html += '</tbody></table>';
+      div.innerHTML = html;
+    }).catch(() => {
+      const div = document.getElementById('historial-unidad-' + unidad);
+      if (div) div.innerHTML = '<div style="padding:16px;color:#999;text-align:center">Sin pagos registrados aún</div>';
+    });
+}
+
+function eliminarPagoGasto(id, unidad, monto) {
+  if (!confirm('¿Eliminar este pago de $' + Number(monto).toLocaleString('es-CL') + '?')) return;
+  const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
+  if (g) g.abonos = Math.max(0, g.abonos - Number(monto));
+  db.collection('pagos').doc(id).delete().then(() => {
+    renderGastosTabla();
+    verHistorialUnidad(unidad);
+  }).catch(() => {
+    renderGastosTabla();
+    verHistorialUnidad(unidad);
+  });
+}
+
 function mostrarGastos() {
   const c = document.getElementById('content');
   c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="buscar-unidad" type="text" placeholder="Ej: 5" style="padding:9px 12px;border:1px solid var(--borde);border-radius:8px;font-size:13px;width:120px" oninput="filtrarGastos()">
+        <button class="btn btn-outline" onclick="filtrarGastos()">🔍 Buscar unidad</button>
+        <button class="btn btn-outline" onclick="limpiarFiltroGastos()">✖ Ver todas</button>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="btn-cerrar-mes" class="btn" style="background:#1a7a4a;color:white;${mesCerrado?'opacity:0.6':''}" onclick="cerrarMesGastos()" ${mesCerrado?'disabled':''}>
           ${mesCerrado ? '✅ Mes cerrado' : '🔒 Cerrar mes ' + MES_ACTUAL}
         </button>
-        <button class="btn btn-outline" onclick="sincronizarAbonosDesdeRecaudacion()" title="Actualiza abonos desde pagos de Recaudación">🔄 Sincronizar abonos</button>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
-        <button class="btn btn-verde" onclick="abrirModalGasto()">+ Nuevo gasto común</button>
+        <button class="btn btn-verde" onclick="abrirModalNuevoPago()">+ Nuevo pago</button>
       </div>
     </div>
     <div class="tabla-wrap">
@@ -807,6 +942,29 @@ function mostrarGastos() {
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="cerrarModalGasto()">Cancelar</button>
           <button class="btn btn-verde" onclick="guardarGasto()">Emitir</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-nuevo-pago" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+      <div style="background:white;border-radius:16px;padding:28px;width:420px;max-width:92vw">
+        <h3 style="margin-bottom:20px;color:var(--verde4)">+ Registrar pago</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <input id="np-unidad" placeholder="N° unidad" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="np-monto" placeholder="Monto ($)" type="number" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="np-fecha" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="np-concepto" placeholder="Concepto (ej: Abono gasto común junio)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <select id="np-forma" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option>Transferencia</option>
+            <option>Efectivo</option>
+            <option>Cheque</option>
+            <option>Débito</option>
+            <option>Ajuste/Compensación</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="cerrarModalNuevoPago()">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarNuevoPago()">✅ Guardar pago</button>
         </div>
       </div>
     </div>
@@ -884,7 +1042,8 @@ function cerrarModalEditarGasto() {
 }
 
 function renderGastosTabla() {
-  const gastosOrdenados = [...GASTOS_JUNIO_2026].sort((a, b) => Number(a.unidad) - Number(b.unidad));
+  const gastosFiltrados = _filtroUnidad ? GASTOS_JUNIO_2026.filter(x => x.unidad === String(_filtroUnidad)) : GASTOS_JUNIO_2026;
+  const gastosOrdenados = [...gastosFiltrados].sort((a, b) => Number(a.unidad) - Number(b.unidad));
   let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
     <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th></th>
   </tr></thead><tbody>`;
@@ -897,7 +1056,7 @@ function renderGastosTabla() {
     const rowColor = deudaTotal > 66000 ? '#fff5f5' : g.saldoFavor > 0 ? '#f0fdf4' : '';
     totProrrateo += g.prorrateo; totTotalMes += g.totalMes; totCapital += g.capitalAtrasado;
     totIntereses += g.intereses; totAbonos += g.abonos; totCobrado += totalCobrado; totSaldo += g.saldoFavor;
-    html += `<tr style="background:${rowColor}">
+    html += `<tr style="background:${rowColor};cursor:pointer" onclick="verHistorialUnidad('${g.unidad}')" title="Ver historial">
       <td><strong>${g.unidad}</strong></td>
       <td>${g.residente}</td>
       <td style="text-align:right">$${g.prorrateo.toLocaleString('es-CL')}</td>
@@ -907,7 +1066,7 @@ function renderGastosTabla() {
       <td style="text-align:right;${g.abonos>0?'color:#16a34a':''}">$${g.abonos.toLocaleString('es-CL')}</td>
       <td style="text-align:right;font-weight:700;color:${totalCobrado>0?'#1a2e1f':'#999'}">$${totalCobrado.toLocaleString('es-CL')}</td>
       <td style="text-align:right;${g.saldoFavor>0?'color:#16a34a;font-weight:600':''}">$${g.saldoFavor.toLocaleString('es-CL')}</td>
-      <td><button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde)" onclick="editarGasto(${idx})">✏️</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde);margin-right:4px" onclick="event.stopPropagation();verHistorialUnidad('${g.unidad}')">📋</button><button class="btn btn-sm" style="background:#1a7a4a;color:white;border:none" onclick="event.stopPropagation();abrirModalNuevoPago('${g.unidad}')">+ Pago</button></td>
     </tr>`;
   });
   html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700">
