@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Condominio Las Araucarias</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -322,17 +323,127 @@ function mostrarPanel() {
 }
 
 // ===================== RESIDENTES =====================
+// ===== EXPORTAR RESIDENTES EXCEL =====
+function exportarResidentesExcel() {
+  db.collection('residentes').get().then(snap => {
+    const docs = [];
+    snap.forEach(d => docs.push(d.data()));
+    docs.sort((a,b) => parseInt(a.unidad||0) - parseInt(b.unidad||0));
+    const ws_data = [['Unidad','Nombre','RUT','Correo','Teléfono','Rol','Deuda']];
+    docs.forEach(r => ws_data.push([r.unidad||'',r.nombre||'',r.rut||'',r.correo||'',r.telefono||'',r.tipo||'',(r.deuda||0)+(r.intereses||0)]));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Residentes');
+    XLSX.writeFile(wb, 'Residentes_Araucarias.xlsx');
+  });
+}
+
+// ===== SELECCIONAR TODOS =====
+function seleccionarTodos(cb) {
+  document.querySelectorAll('.sel-residente').forEach(c => c.checked = cb.checked);
+}
+
+// ===== ENVÍO MASIVO =====
+function abrirEnvioMasivo() {
+  const seleccionados = [...document.querySelectorAll('.sel-residente:checked')];
+  if (seleccionados.length === 0) {
+    alert('Selecciona al menos una unidad marcando las casillas de la izquierda');
+    return;
+  }
+  const correos = seleccionados.map(c => ({id: c.value, correo: c.dataset.correo, nombre: c.dataset.nombre})).filter(c => c.correo);
+  if (correos.length === 0) { alert('Las unidades seleccionadas no tienen correo registrado'); return; }
+  document.getElementById('em-destinatarios').textContent = correos.length + ' destinatario(s): ' + correos.map(c=>c.nombre).join(', ');
+  document.getElementById('em-lista').value = JSON.stringify(correos);
+  document.getElementById('modal-envio-masivo').style.display = 'flex';
+}
+
+// ===== ENVÍO INDIVIDUAL =====
+function enviarCorreoUnidad(id) {
+  const r = window._resMap && window._resMap[id];
+  if (!r) return;
+  if (!r.correo) { alert('Esta unidad no tiene correo registrado'); return; }
+  document.getElementById('em-destinatarios').textContent = 'Para: ' + r.nombre + ' <' + r.correo + '>';
+  document.getElementById('em-lista').value = JSON.stringify([{id, correo: r.correo, nombre: r.nombre}]);
+  document.getElementById('modal-envio-masivo').style.display = 'flex';
+}
+
+// ===== ENVIAR CORREOS =====
+function enviarCorreos() {
+  const asunto = document.getElementById('em-asunto').value.trim();
+  const cuerpo = document.getElementById('em-cuerpo').value.trim();
+  const lista = JSON.parse(document.getElementById('em-lista').value || '[]');
+  if (!asunto || !cuerpo) { alert('Ingresa asunto y mensaje'); return; }
+  if (lista.length === 0) { alert('Sin destinatarios'); return; }
+  // Verificar EmailJS configurado
+  const serviceId = document.getElementById('ejs-service')?.value?.trim();
+  const templateId = document.getElementById('ejs-template')?.value?.trim();
+  const publicKey = document.getElementById('ejs-key')?.value?.trim();
+  if (!serviceId || !templateId || !publicKey) {
+    alert('⚠️ Configura primero el Service ID, Template ID y Public Key de EmailJS');
+    return;
+  }
+  emailjs.init(publicKey);
+  let enviados = 0, errores = 0;
+  const btn = document.getElementById('btn-enviar-correos');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  const enviarSiguiente = (i) => {
+    if (i >= lista.length) {
+      btn.disabled = false; btn.textContent = '📧 Enviar';
+      alert('✅ ' + enviados + ' enviados. ' + (errores>0?errores+' errores.':''));
+      document.getElementById('modal-envio-masivo').style.display = 'none';
+      return;
+    }
+    const dest = lista[i];
+    emailjs.send(serviceId, templateId, {
+      to_email: dest.correo,
+      to_name: dest.nombre,
+      subject: asunto,
+      message: cuerpo,
+      from_name: 'Condominio Las Araucarias',
+      reply_to: 'adm.lasaraucarias2020@gmail.com'
+    }).then(() => { enviados++; enviarSiguiente(i+1); })
+      .catch(() => { errores++; enviarSiguiente(i+1); });
+  };
+  enviarSiguiente(0);
+}
+
 function mostrarResidentes() {
   const c = document.getElementById('content');
   c.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px">
       <button class="btn btn-verde" onclick="abrirModalResidente()">+ Agregar residente</button>
+      <button class="btn btn-outline" onclick="exportarResidentesExcel()">📤 Exportar Excel</button>
       <button class="btn" style="background:#6c3483;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="abrirImportarExcel()">📥 Importar Excel</button>
+      <button class="btn" style="background:#0e6655;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="abrirEnvioMasivo()">📧 Envío masivo</button>
     </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Listado de residentes</h3></div>
       <div id="lista-residentes"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
     </div>
+    <div id="modal-envio-masivo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+      <div style="background:white;border-radius:16px;padding:28px;width:560px;max-width:94vw;max-height:90vh;overflow-y:auto">
+        <h3 style="margin-bottom:16px;color:var(--verde4)">📧 Enviar correo</h3>
+        <div style="background:#e8f5ee;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a7a4a" id="em-destinatarios"></div>
+        <input type="hidden" id="em-lista">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="background:#fff3cd;border-radius:8px;padding:12px;font-size:12px">
+            ⚙️ <strong>Configuración EmailJS</strong> (solo la primera vez)
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <input id="ejs-service" placeholder="Service ID" style="padding:6px;border:1px solid var(--borde);border-radius:6px;font-size:12px;flex:1">
+              <input id="ejs-template" placeholder="Template ID" style="padding:6px;border:1px solid var(--borde);border-radius:6px;font-size:12px;flex:1">
+              <input id="ejs-key" placeholder="Public Key" style="padding:6px;border:1px solid var(--borde);border-radius:6px;font-size:12px;flex:1">
+            </div>
+          </div>
+          <input id="em-asunto" placeholder="Asunto del correo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <textarea id="em-cuerpo" placeholder="Mensaje..." rows="8" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="document.getElementById('modal-envio-masivo').style.display='none'">Cancelar</button>
+          <button class="btn btn-verde" id="btn-enviar-correos" onclick="enviarCorreos()">📧 Enviar</button>
+        </div>
+      </div>
+    </div>
+
     <div id="modal-residente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center">
       <div style="background:white;border-radius:16px;padding:28px;width:400px;max-width:90vw">
         <h3 style="margin-bottom:20px;color:var(--verde4)">Agregar residente</h3>
@@ -369,17 +480,21 @@ function cargarResidentes() {
     snap.forEach(d => docs.push({...d.data(), _id: d.id}));
     window._resMap = {}; docs.forEach(d=>window._resMap[d._id]=d);
     docs.sort((a,b) => parseInt(a.unidad||0) - parseInt(b.unidad||0));
-    let html = '<table><thead><tr><th>Unidad</th><th>Nombre</th><th>RUT</th><th>Correo</th><th>Teléfono</th><th>Tipo</th><th>Deuda</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th><input type="checkbox" id="sel-todos" onchange="seleccionarTodos(this)"></th><th>Unidad</th><th>Nombre</th><th>Rol</th><th>Correo</th><th>Acciones</th></tr></thead><tbody>';
     docs.forEach(r => {
       const total = (r.deuda||0)+(r.intereses||0);
       const estadoBadge = total > 0 ? '<span class="badge badge-rojo">En mora</span>' : '<span class="badge badge-verde">Al día</span>';
+      const rolColor = r.tipo==='Propietario'?'#1a5276':r.tipo==='Arrendatario'?'#6c3483':'#0e6655';
       html += `<tr>
-        <td>${r.unidad||'—'}</td><td>${r.nombre||'—'}</td><td>${r.rut||'—'}</td>
-        <td>${r.correo||'—'}</td><td>${r.telefono||'—'}</td><td>${r.tipo||'—'}</td>
-        <td>$${total.toLocaleString('es-CL')}</td><td>${estadoBadge}</td>
+        <td><input type="checkbox" class="sel-residente" value="${r._id}" data-correo="${r.correo||''}" data-nombre="${r.nombre||''}"></td>
+        <td><strong>${r.unidad||'—'}</strong></td>
+        <td>${r.nombre||'—'}</td>
+        <td><span style="background:${rolColor};color:white;padding:2px 8px;border-radius:10px;font-size:11px">${r.tipo||'—'}</span></td>
+        <td>${r.correo?'<a href="mailto:'+r.correo+'" style="color:var(--verde4)">'+r.correo+'</a>':'<span style="color:#999">Sin correo</span>'}</td>
         <td style="white-space:nowrap">
-          <button style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="editarResidenteId('${r._id}')">✏️</button>
-          <button style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px" onclick="eliminarResidente('${r._id}','${(r.nombre||'').replace(/'/g,'')}')">🗑️</button>
+          <button style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="editarResidenteId('${r._id}')">✏️ Editar</button>
+          <button style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="eliminarResidente('${r._id}','${(r.nombre||'').replace(/'/g,'')}')">🗑️</button>
+          <button style="background:#0e6655;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px" onclick="enviarCorreoUnidad('${r._id}')">📧</button>
         </td>
       </tr>`;
     });
