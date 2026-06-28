@@ -3879,7 +3879,8 @@ function cargarConciliacion2() {
 
     pSnap.forEach(d => {
       const p = d.data();
-      if(!p.fecha||p.fecha<inicio||p.fecha>fin||p.tipo==='Ajuste') return;
+      const esAjuste = p.tipo==='Ajuste' || (p.forma||'').toLowerCase().includes('ajuste') || (p.forma||'').toLowerCase().includes('compensaci');
+      if(!p.fecha||p.fecha<inicio||p.fecha>fin||esAjuste) return;
       const m = Number(p.monto||0);
       if(esBanco(p.forma)){ banco.push({f:p.fecha,desc:`Pago GC U${p.unidad||''} - ${p.concepto||''}`,ing:m,egr:0,id:d.id,col:'pagos'}); ingB+=m; }
       else { caja.push({f:p.fecha,desc:`Pago efectivo U${p.unidad||''} - ${p.concepto||''}`,ing:m,egr:0,id:d.id,col:'pagos'}); ingC+=m; }
