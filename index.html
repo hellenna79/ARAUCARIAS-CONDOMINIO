@@ -929,6 +929,23 @@ function verHistorialUnidad(unidad) {
     });
 }
 
+function editarInteresUnidad(unidad) {
+  const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
+  if (!g) return;
+  const actual = g.intereses || 0;
+  const nuevo = prompt('Interés unidad ' + unidad + ' — ' + g.residente + '\nDeja en 0 si no aplica interés:', actual);
+  if (nuevo === null) return;
+  const monto = Number(String(nuevo).replace(/[^0-9]/g,'')) || 0;
+  g.intereses = monto;
+  // Guardar en Firestore para persistir
+  db.collection('gastos_intereses').doc('junio2026-u'+unidad).set({
+    unidad: String(unidad), intereses: monto, actualizado: new Date().toISOString()
+  }).catch(() => {});
+  renderGastosTabla();
+  const hist = document.getElementById('panel-historial');
+  if (hist) verHistorialUnidad(unidad);
+}
+
 function eliminarPagoGasto(id, unidad, monto) {
   if (!confirm('¿Eliminar este pago de $' + Number(monto).toLocaleString('es-CL') + '?')) return;
   const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
@@ -1080,40 +1097,49 @@ function cerrarModalEditarGasto() {
 function renderGastosTabla() {
   const gastosFiltrados = _filtroUnidad ? GASTOS_JUNIO_2026.filter(x => x.unidad === String(_filtroUnidad)) : GASTOS_JUNIO_2026;
   const gastosOrdenados = [...gastosFiltrados].sort((a, b) => Number(a.unidad) - Number(b.unidad));
-  let html = `<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr>
-    <th>Unidad</th><th>Residente</th><th>Prorrateo</th><th>Total Mes</th><th>Capital Atrasado</th><th>Intereses</th><th>Abonos</th><th>Total Cobrado</th><th>Saldo Favor</th><th></th>
-  </tr></thead><tbody>`;
-  let totProrrateo=0, totTotalMes=0, totCapital=0, totIntereses=0, totAbonos=0, totCobrado=0, totSaldo=0;
+  let html = `<div style="overflow-x:auto"><table style="font-size:13px;width:100%;border-collapse:collapse">
+    <thead><tr style="background:#e8f5ee;border-bottom:2px solid var(--borde)">
+      <th style="padding:10px 12px;text-align:left">Unidad</th>
+      <th style="padding:10px 12px;text-align:left">Residente</th>
+      <th style="padding:10px 12px;text-align:right">Cobrado</th>
+      <th style="padding:10px 12px;text-align:right">Pagado</th>
+      <th style="padding:10px 12px;text-align:right">Interés</th>
+      <th style="padding:10px 12px;text-align:right">Saldo</th>
+      <th style="padding:10px 12px;text-align:center">Acciones</th>
+    </tr></thead><tbody>`;
+  let totCobrado=0, totPagado=0, totInteres=0, totSaldo=0;
   gastosOrdenados.forEach(g => {
-    const idx = GASTOS_JUNIO_2026.indexOf(g);
-    // Total cobrado = Capital Atrasado + Total Mes + Intereses - Abonos
-    const totalCobrado = Math.max(0, g.capitalAtrasado + g.totalMes + g.intereses - g.abonos);
-    const deudaTotal = g.capitalAtrasado + g.totalMes + g.intereses;
-    const rowColor = deudaTotal > 66000 ? '#fff5f5' : g.saldoFavor > 0 ? '#f0fdf4' : '';
-    totProrrateo += g.prorrateo; totTotalMes += g.totalMes; totCapital += g.capitalAtrasado;
-    totIntereses += g.intereses; totAbonos += g.abonos; totCobrado += totalCobrado; totSaldo += g.saldoFavor;
-    html += `<tr style="background:${rowColor};cursor:pointer" onclick="verHistorialUnidad('${g.unidad}')" title="Ver historial">
-      <td><strong>${g.unidad}</strong></td>
-      <td>${g.residente}</td>
-      <td style="text-align:right">$${g.prorrateo.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.totalMes>0?'color:#1a7a4a;font-weight:600':'color:#999'}">$${g.totalMes.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.capitalAtrasado>0?'color:#dc2626;font-weight:600':''}">$${g.capitalAtrasado.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.intereses>0?'color:#f97316':''}">$${g.intereses.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.abonos>0?'color:#16a34a':''}">$${g.abonos.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;font-weight:700;color:${totalCobrado>0?'#1a2e1f':'#999'}">$${totalCobrado.toLocaleString('es-CL')}</td>
-      <td style="text-align:right;${g.saldoFavor>0?'color:#16a34a;font-weight:600':''}">$${g.saldoFavor.toLocaleString('es-CL')}</td>
-      <td style="white-space:nowrap"><button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde);margin-right:4px" onclick="event.stopPropagation();verHistorialUnidad('${g.unidad}')">📋</button><button class="btn btn-sm" style="background:#1a7a4a;color:white;border:none" onclick="event.stopPropagation();abrirModalNuevoPago('${g.unidad}')">+ Pago</button></td>
+    const cobrado = g.capitalAtrasado + g.totalMes;
+    const interes = g.intereses || 0;
+    const pagado = g.abonos || 0;
+    const saldo = pagado - cobrado - interes; // positivo = a favor, negativo = debe
+    const saldoColor = saldo >= 0 ? '#16a34a' : '#dc2626';
+    const saldoTexto = (saldo >= 0 ? '' : '-') + '$' + Math.abs(saldo).toLocaleString('es-CL');
+    const rowBg = saldo >= 0 ? '#f0fdf4' : saldo < -100000 ? '#fff5f5' : '';
+    totCobrado += cobrado; totPagado += pagado; totInteres += interes; totSaldo += saldo;
+    html += `<tr style="background:${rowBg};border-bottom:1px solid #eee;cursor:pointer" onclick="verHistorialUnidad('${g.unidad}')" title="Ver historial">
+      <td style="padding:10px 12px;font-weight:700">${g.unidad}</td>
+      <td style="padding:10px 12px">${g.residente}</td>
+      <td style="padding:10px 12px;text-align:right;font-weight:600">$${cobrado.toLocaleString('es-CL')}</td>
+      <td style="padding:10px 12px;text-align:right;color:#16a34a;font-weight:600">${pagado>0?'$'+pagado.toLocaleString('es-CL'):'$0'}</td>
+      <td style="padding:10px 12px;text-align:right">
+        <span style="color:${interes>0?'#f97316':'#999'}">${interes>0?'$'+interes.toLocaleString('es-CL'):'$0'}</span>
+        <button onclick="event.stopPropagation();editarInteresUnidad('${g.unidad}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#999;margin-left:4px" title="Editar interés">✏️</button>
+      </td>
+      <td style="padding:10px 12px;text-align:right;font-weight:700;color:${saldoColor}">${saldoTexto}</td>
+      <td style="padding:10px 12px;text-align:center;white-space:nowrap">
+        <button class="btn btn-sm" style="background:#1a7a4a;color:white;border:none;font-size:12px" onclick="event.stopPropagation();abrirModalNuevoPago('${g.unidad}')">+ Pago</button>
+      </td>
     </tr>`;
   });
-  html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700">
-    <td colspan="2">TOTALES</td>
-    <td style="text-align:right">$${totProrrateo.toLocaleString('es-CL')}</td>
-    <td style="text-align:right;color:#1a7a4a">$${totTotalMes.toLocaleString('es-CL')}</td>
-    <td style="text-align:right;color:#dc2626">$${totCapital.toLocaleString('es-CL')}</td>
-    <td style="text-align:right;color:#f97316">$${totIntereses.toLocaleString('es-CL')}</td>
-    <td style="text-align:right;color:#16a34a">$${totAbonos.toLocaleString('es-CL')}</td>
-    <td style="text-align:right">$${totCobrado.toLocaleString('es-CL')}</td>
-    <td style="text-align:right;color:#16a34a">$${totSaldo.toLocaleString('es-CL')}</td>
+  const totSaldoColor = totSaldo >= 0 ? '#16a34a' : '#dc2626';
+  const totSaldoTexto = (totSaldo >= 0 ? '' : '-') + '$' + Math.abs(totSaldo).toLocaleString('es-CL');
+  html += `</tbody><tfoot><tr style="background:#e8f5ee;font-weight:700;border-top:2px solid var(--borde)">
+    <td colspan="2" style="padding:10px 12px">TOTALES</td>
+    <td style="padding:10px 12px;text-align:right">$${totCobrado.toLocaleString('es-CL')}</td>
+    <td style="padding:10px 12px;text-align:right;color:#16a34a">$${totPagado.toLocaleString('es-CL')}</td>
+    <td style="padding:10px 12px;text-align:right;color:#f97316">$${totInteres>0?'$'+totInteres.toLocaleString('es-CL'):'$0'}</td>
+    <td style="padding:10px 12px;text-align:right;color:${totSaldoColor}">${totSaldoTexto}</td>
     <td></td>
   </tr></tfoot></table></div>`;
   const listaGastos = document.getElementById('lista-gastos');
