@@ -1121,7 +1121,7 @@ function renderGastosTabla() {
     const saldoTexto = (saldo >= 0 ? '' : '-') + '$' + Math.abs(saldo).toLocaleString('es-CL');
     const rowBg = saldo >= 0 ? '#f0fdf4' : saldo < -100000 ? '#fff5f5' : '';
     totCobrado += cobrado; totPagado += pagado; totInteres += interes; totSaldo += saldo;
-    html += `<tr style="background:${rowBg};border-bottom:1px solid #eee;cursor:pointer" onclick="verHistorialUnidad('${g.unidad}')" title="Ver historial">
+    html += `<tr style="background:${rowBg};border-bottom:1px solid #eee;cursor:pointer;user-select:none" onclick="verHistorialUnidad('${g.unidad}')" title="Ver historial">
       <td style="padding:10px 12px;font-weight:700">${g.unidad}</td>
       <td style="padding:10px 12px">${g.residente}</td>
       <td style="padding:10px 12px;text-align:right;font-weight:600">$${cobrado.toLocaleString('es-CL')}</td>
@@ -1132,7 +1132,7 @@ function renderGastosTabla() {
       </td>
       <td style="padding:10px 12px;text-align:right;font-weight:700;color:${saldoColor}">${saldoTexto}</td>
       <td style="padding:10px 12px;text-align:center;white-space:nowrap">
-        <button class="btn btn-sm" style="background:#1a7a4a;color:white;border:none;font-size:12px" onclick="event.stopPropagation();abrirModalNuevoPago('${g.unidad}')">+ Pago</button>
+        <button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde);font-size:12px;margin-right:4px" onclick="event.stopPropagation();verHistorialUnidad('${g.unidad}')">📋 Ver</button><button class="btn btn-sm" style="background:#1a7a4a;color:white;border:none;font-size:12px" onclick="event.stopPropagation();abrirModalNuevoPago('${g.unidad}')">+ Pago</button>
       </td>
     </tr>`;
   });
