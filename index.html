@@ -4281,50 +4281,7 @@ function guardarRegistroCarta(tipo){
 
 // ===== IMPORTACION EXCEL =====
 let _excelData=[];
-function abrirImportarExcel(){
-  if(document.getElementById('modal-excel')) { document.getElementById('modal-excel').style.display='flex'; return; }
-  const m=document.createElement('div');
-  m.id='modal-excel';
-  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML=`<div style="background:white;border-radius:16px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
-    <h3 style="margin-bottom:16px;color:#6c3483">📥 Importar desde CSV/Excel</h3>
-    <div style="background:#f4f6f4;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:#555">
-      <strong>Columnas requeridas:</strong> unidad, nombre, rut, correo, telefono, deuda<br>
-      Guarda tu Excel como CSV (separado por comas) antes de subir.
-    </div>
-    <input type="file" id="excel-file" accept=".csv,.xlsx" style="width:100%;padding:10px;border:1px dashed #ccc;border-radius:8px;font-size:13px">
-    <div id="excel-preview" style="margin-top:12px;display:none;font-size:12px;overflow-x:auto"></div>
-    <div id="excel-status" style="margin-top:10px;font-size:13px"></div>
-    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
-      <button class="btn btn-outline" onclick="document.getElementById('modal-excel').style.display='none'">Cancelar</button>
-      <button id="btn-importar" class="btn" style="background:#6c3483;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px;display:none" onclick="ejecutarImportacion()">✅ Importar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-  document.getElementById('excel-file').onchange=function(e){
-    const file=e.target.files[0]; if(!file) return;
-    const reader=new FileReader();
-    reader.onload=function(ev){
-      const lines=ev.target.result.split('\n').map(r=>r.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
-      if(lines.length<2){ document.getElementById('excel-status').innerHTML='⚠️ Archivo vacío'; return; }
-      const h=lines[0].map(x=>x.toLowerCase());
-      const iU=h.findIndex(x=>x.includes('unidad')),iN=h.findIndex(x=>x.includes('nombre'));
-      const iR=h.findIndex(x=>x.includes('rut')),iC=h.findIndex(x=>x.includes('correo')||x.includes('email'));
-      const iT=h.findIndex(x=>x.includes('tel')||x.includes('fono')),iD=h.findIndex(x=>x.includes('deuda'));
-      if(iU<0||iN<0){ document.getElementById('excel-status').innerHTML='❌ No se encontraron columnas "unidad" y "nombre"'; return; }
-      _excelData=lines.slice(1).filter(r=>r[iU]&&r[iN]).map(r=>({unidad:r[iU],nombre:r[iN],rut:iR>=0?r[iR]:'',correo:iC>=0?r[iC]:'',telefono:iT>=0?r[iT]:'',deuda:iD>=0?parseFloat(r[iD])||0:0,intereses:0,estado:'Al día'}));
-      const prev=document.getElementById('excel-preview');
-      prev.style.display='block';
-      prev.innerHTML='<strong>Vista previa (5 primeras filas):</strong><br><table style="border-collapse:collapse;width:100%;margin-top:6px">'+
-        '<thead><tr style="background:#6c3483;color:white"><th style="padding:4px 8px">Unidad</th><th style="padding:4px 8px">Nombre</th><th style="padding:4px 8px">RUT</th><th style="padding:4px 8px">Correo</th><th style="padding:4px 8px">Deuda</th></tr></thead><tbody>'+
-        _excelData.slice(0,5).map((r,i)=>`<tr style="background:${i%2?'#f9f9f9':'white'}"><td style="padding:4px 8px;font-size:12px">${r.unidad}</td><td style="padding:4px 8px;font-size:12px">${r.nombre}</td><td style="padding:4px 8px;font-size:12px">${r.rut}</td><td style="padding:4px 8px;font-size:12px">${r.correo}</td><td style="padding:4px 8px;font-size:12px">$${r.deuda.toLocaleString('es-CL')}</td></tr>`).join('')+
-        '</tbody></table>';
-      document.getElementById('excel-status').innerHTML=`✅ <strong>${_excelData.length} registros</strong> listos para importar`;
-      document.getElementById('btn-importar').style.display='inline-block';
-    };
-    reader.readAsText(file);
-  };
-}
+
 async function ejecutarImportacion(){
   if(!_excelData.length) return;
   document.getElementById('excel-status').innerHTML='⏳ Importando...';
