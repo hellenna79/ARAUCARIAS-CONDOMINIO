@@ -375,13 +375,9 @@ function enviarCorreos() {
   if (!asunto || !cuerpo) { alert('Ingresa asunto y mensaje'); return; }
   if (lista.length === 0) { alert('Sin destinatarios'); return; }
   // Verificar EmailJS configurado
-  const serviceId = document.getElementById('ejs-service')?.value?.trim();
-  const templateId = document.getElementById('ejs-template')?.value?.trim();
-  const publicKey = document.getElementById('ejs-key')?.value?.trim();
-  if (!serviceId || !templateId || !publicKey) {
-    alert('⚠️ Configura primero el Service ID, Template ID y Public Key de EmailJS');
-    return;
-  }
+  const serviceId = 'service_h8lfgpl';
+  const templateId = 'template_y2hoicq';
+  const publicKey = '33UWFIBc9PKG4WTEy';
   emailjs.init(publicKey);
   let enviados = 0, errores = 0;
   const btn = document.getElementById('btn-enviar-correos');
@@ -399,8 +395,11 @@ function enviarCorreos() {
       to_name: dest.nombre,
       subject: asunto,
       message: cuerpo,
-      from_name: 'Condominio Las Araucarias',
-      reply_to: 'adm.lasaraucarias2020@gmail.com'
+      nombre: dest.nombre,
+      mensaje: cuerpo,
+      email: dest.correo,
+      title: asunto,
+      name: 'Condominio Las Araucarias'
     }).then(() => { enviados++; enviarSiguiente(i+1); })
       .catch(() => { errores++; enviarSiguiente(i+1); });
   };
@@ -426,14 +425,7 @@ function mostrarResidentes() {
         <div style="background:#e8f5ee;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a7a4a" id="em-destinatarios"></div>
         <input type="hidden" id="em-lista">
         <div style="display:flex;flex-direction:column;gap:10px">
-          <div style="background:#fff3cd;border-radius:8px;padding:12px;font-size:12px">
-            ⚙️ <strong>Configuración EmailJS</strong> (solo la primera vez)
-            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-              <input id="ejs-service" placeholder="Service ID" style="padding:6px;border:1px solid var(--borde);border-radius:6px;font-size:12px;flex:1">
-              <input id="ejs-template" placeholder="Template ID" style="padding:6px;border:1px solid var(--borde);border-radius:6px;font-size:12px;flex:1">
-              <input id="ejs-key" placeholder="Public Key" style="padding:6px;border:1px solid var(--borde);border-radius:6px;font-size:12px;flex:1">
-            </div>
-          </div>
+          <div style="background:#e8f5ee;border-radius:8px;padding:8px 12px;font-size:12px;color:#1a7a4a">✅ Configurado — enviará desde adm.lasaraucarias2020@gmail.com</div>
           <input id="em-asunto" placeholder="Asunto del correo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <textarea id="em-cuerpo" placeholder="Mensaje..." rows="8" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical"></textarea>
         </div>
