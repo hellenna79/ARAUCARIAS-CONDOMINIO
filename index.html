@@ -3713,9 +3713,9 @@ function mostrarConciliacion() {
         <h4 style="margin:0 0 12px;color:var(--verde4)">💾 Saldos iniciales del período</h4>
         <div style="display:flex;flex-direction:column;gap:8px">
           <label style="font-size:12px;font-weight:600">Saldo inicial banco ($)</label>
-          <input id="saldo-ini-banco" type="number" placeholder="0" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="saldo-ini-banco" type="text" placeholder="Ej: 536.116" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
           <label style="font-size:12px;font-weight:600">Saldo inicial caja ($)</label>
-          <input id="saldo-ini-caja" type="number" placeholder="0" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="saldo-ini-caja" type="text" placeholder="Ej: 178.221" style="padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:13px" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
           <button class="btn btn-verde" onclick="guardarSaldosIniciales()" style="margin-top:4px">💾 Guardar saldos</button>
         </div>
       </div>
@@ -3742,6 +3742,8 @@ function mostrarConciliacion() {
         ${[2024,2025,2026,2027].map(a=>`<option value="${a}" ${a===anioActual?'selected':''}>${a}</option>`).join('')}
       </select>
       <button class="btn btn-verde" onclick="cargarConciliacion2()">🔄 Actualizar</button>
+      <button class="btn btn-verde" onclick="abrirModalIngresoConciliacion()">+ Agregar ingreso</button>
+      <button class="btn btn-outline" onclick="abrirModalEgresoConciliacion()">+ Agregar egreso efectivo</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="tabla-wrap">
@@ -3764,8 +3766,55 @@ function mostrarConciliacion() {
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>📊 Flujo del mes</h3></div>
       <table style="width:100%;border-collapse:collapse"><tbody id="tbody-flujo"></tbody></table>
+    </div>
+
+    <div id="modal-ingreso-conc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+      <div style="background:white;border-radius:16px;padding:28px;width:400px;max-width:92vw">
+        <h3 style="margin-bottom:16px;color:var(--verde4)">+ Agregar ingreso</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input id="ci-fecha" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="ci-desc" placeholder="Descripción (ej: Total ingresos enero 2026)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <input id="ci-monto" type="number" placeholder="Monto ($)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <select id="ci-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="Transferencia">Transferencia (banco)</option>
+            <option value="Efectivo">Efectivo (caja)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="document.getElementById('modal-ingreso-conc').style.display='none'">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarIngresoConciliacion()">✅ Guardar</button>
+        </div>
+      </div>
     </div>`;
   cargarConciliacion2();
+}
+
+function abrirModalIngresoConciliacion() {
+  document.getElementById('ci-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ci-desc').value = '';
+  document.getElementById('ci-monto').value = '';
+  document.getElementById('modal-ingreso-conc').style.display = 'flex';
+}
+function abrirModalEgresoConciliacion() {
+  document.getElementById('ci-desc').value = '';
+  document.getElementById('ci-monto').value = '';
+  document.getElementById('ci-tipo').value = 'Efectivo';
+  document.getElementById('ci-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('modal-ingreso-conc').style.display = 'flex';
+}
+function guardarIngresoConciliacion() {
+  const fecha = document.getElementById('ci-fecha').value;
+  const desc = document.getElementById('ci-desc').value.trim();
+  const monto = Number(document.getElementById('ci-monto').value);
+  const forma = document.getElementById('ci-tipo').value;
+  if (!fecha || !monto) { alert('Ingresa fecha y monto'); return; }
+  db.collection('pagos').add({
+    fecha, concepto: desc||'Ingreso', monto, forma, unidad: '—', tipo: 'Ingreso', manual: true
+  }).then(() => {
+    document.getElementById('modal-ingreso-conc').style.display = 'none';
+    alert('✅ Ingreso registrado');
+    cargarConciliacion2();
+  }).catch(e => alert('Error: ' + e.message));
 }
 
 function cargarConciliacion2() {
