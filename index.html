@@ -328,7 +328,7 @@ function filtrarResidentes() {
   const q = (document.getElementById('buscar-residente')?.value||'').toLowerCase().trim();
   const docs = Object.values(window._resMap||{});
   const filtrados = q ? docs.filter(r => 
-    String(r.unidad||'').includes(q) || 
+    String(r.unidad||'') === q || 
     (r.nombre||'').toLowerCase().includes(q)
   ) : docs;
   filtrados.sort((a,b) => parseInt(a.unidad||0) - parseInt(b.unidad||0));
@@ -346,7 +346,7 @@ function renderResidentes(docs) {
     html += `<tr>
       <td><input type="checkbox" class="sel-residente" value="${r._id}" data-correo="${r.correo||''}" data-nombre="${r.nombre||''}"></td>
       <td><strong>${r.unidad||'—'}</strong></td>
-      <td>${r.nombre||'—'}</td>
+      <td>${r.nombre||'—'}<br><span style='font-size:11px;color:#999'>${r.rut||''}</span></td>
       <td><span style="background:${rc};color:white;padding:2px 8px;border-radius:10px;font-size:11px">${r.tipo||'—'}</span></td>
       <td>${r.correo?'<a href="mailto:'+r.correo+'" style="color:var(--verde4)">'+r.correo+'</a>':'<span style="color:#999">Sin correo</span>'}</td>
       <td style="font-size:12px;color:#555">${r.telefono||'—'}</td>
