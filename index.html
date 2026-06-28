@@ -2165,11 +2165,14 @@ function mostrarLibroDiario() {
 }
 
 function cargarAsientos() {
-  db.collection('libro_diario').orderBy('fecha','desc').get().then(snap => {
+  db.collection('libro_diario').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-asientos').innerHTML = '<div style="padding:24px;text-align:center;color:#999">No hay asientos registrados</div>'; return; }
+    const asientos = [];
+    snap.forEach(d => asientos.push({...d.data(), _id: d.id}));
+    asientos.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
     let html = '<table><thead><tr><th>N°</th><th>Fecha</th><th>Glosa</th><th>Cuenta Debe</th><th>Debe</th><th>Cuenta Haber</th><th>Haber</th><th>Doc.</th><th>Acciones</th></tr></thead><tbody>';
-    snap.forEach(d => {
-      const a = d.data(); const id = d.id;
+    asientos.forEach(d => {
+      const a = d; const id = d._id;
       html += `<tr><td>${a.numero||'—'}</td><td>${a.fecha||'—'}</td><td>${a.glosa||'—'}</td><td>${a.cuentaDebe||'—'}</td><td style="text-align:right">$${Number(a.montoDebe||0).toLocaleString('es-CL')}</td><td>${a.cuentaHaber||'—'}</td><td style="text-align:right">$${Number(a.montoHaber||0).toLocaleString('es-CL')}</td><td>${a.documento||'—'}</td>
       <td style="white-space:nowrap"><button class="btn btn-sm" style="background:#2563eb;color:white;font-size:11px;padding:4px 8px;margin-right:4px" onclick="editarAsiento('${id}',${JSON.stringify(a).replace(/'/g,"&#39;")})">✏️</button><button class="btn btn-sm" style="background:#dc2626;color:white;font-size:11px;padding:4px 8px" onclick="eliminarAsiento('${id}')">🗑️</button></td></tr>`;
     });
