@@ -324,6 +324,18 @@ function mostrarPanel() {
 
 // ===================== RESIDENTES =====================
 // ===== EXPORTAR RESIDENTES EXCEL =====
+function eliminarTodosResidentes() {
+  if (!confirm('¿Eliminar TODOS los residentes? Esto no se puede deshacer.')) return;
+  db.collection('residentes').get().then(snap => {
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    return batch.commit();
+  }).then(() => {
+    alert('✅ Todos los residentes eliminados. Ahora puedes importar el Excel.');
+    cargarResidentes();
+  }).catch(e => alert('Error: ' + e.message));
+}
+
 function exportarResidentesExcel() {
   db.collection('residentes').get().then(snap => {
     const docs = [];
@@ -412,6 +424,7 @@ function mostrarResidentes() {
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px">
       <button class="btn btn-verde" onclick="abrirModalResidente()">+ Agregar residente</button>
       <button class="btn btn-outline" onclick="exportarResidentesExcel()">📤 Exportar Excel</button>
+      <button class="btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="eliminarTodosResidentes()">🗑️ Eliminar todos</button>
       <button class="btn" style="background:#6c3483;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="abrirImportarExcel()">📥 Importar Excel</button>
       <button class="btn" style="background:#0e6655;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="abrirEnvioMasivo()">📧 Envío masivo</button>
     </div>
