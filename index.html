@@ -503,7 +503,7 @@ function mostrarResidentes() {
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="document.getElementById('modal-excel').style.display='none'">Cancelar</button>
-          <button id="btn-importar" class="btn btn-verde" style="display:none" onclick="ejecutarImportacion()">✅ Importar</button>
+          <button id="btn-importar-nuevo" class="btn btn-verde" onclick="ejecutarImportacion()">✅ Importar</button>
         </div>
       </div>
     </div>
@@ -3865,6 +3865,7 @@ function cerrarModalExcelYRecargar() {
 }
 
 async function ejecutarImportacion(){
+  alert('Iniciando importación de ' + excelDatosParaImportar.length + ' registros...');
   if(!excelDatosParaImportar.length){ alert('No hay datos para importar'); return; }
   mostrarStatusExcel('⏳ Importando ' + excelDatosParaImportar.length + ' registros...','#2980b9');
   document.getElementById('btn-importar').disabled=true;
