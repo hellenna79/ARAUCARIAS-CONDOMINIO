@@ -3727,8 +3727,16 @@ function procesarFilasExcel(filas){
     return;
   }
   
-  // Primera fila = encabezados
-  const headers = filas[0].map(h=>h.toLowerCase().trim());
+  // Buscar fila de encabezados (puede no ser la primera)
+  let headerRow = 0;
+  for (let i = 0; i < Math.min(filas.length, 10); i++) {
+    const row = filas[i].map(c => String(c||'').toLowerCase());
+    if (row.some(c => c.includes('unidad')) && row.some(c => c.includes('nombre'))) {
+      headerRow = i; break;
+    }
+  }
+  filas = filas.slice(headerRow);
+  const headers = filas[0].map(h=>String(h||'').toLowerCase().trim());
   const idxUnidad = headers.findIndex(h=>h.includes('unidad'));
   const idxNombre = headers.findIndex(h=>h.includes('nombre'));
   const idxRut = headers.findIndex(h=>h.includes('rut'));
