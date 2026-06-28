@@ -2308,11 +2308,19 @@ function mostrarFlujoCaja() {
   c.innerHTML = `<div id="flujo-content"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>`;
   Promise.all([db.collection('pagos').get(), db.collection('egresos').get()]).then(([pagosSnap, egresosSnap]) => {
     const meses = {};
+    // Detectar meses con ingreso manual (total mensual ingresado en conciliación)
+    const mesesConManual = new Set();
+    pagosSnap.forEach(d => { const p = d.data(); if (p.manual && p.fecha) mesesConManual.add(p.fecha.slice(0,7)); });
+
     pagosSnap.forEach(d => {
       const p = d.data();
-      if (!p.fecha || p.tipo === 'Ajuste') return; // Ajustes no son ingresos reales
+      if (!p.fecha || p.tipo === 'Ajuste') return;
+      const esAjuste = (p.forma||'').toLowerCase().includes('ajuste') || (p.forma||'').toLowerCase().includes('compensaci');
+      if (esAjuste) return;
       const mes = p.fecha.slice(0,7);
       if (!meses[mes]) meses[mes]={ingresos:0,egresos:0};
+      // Si el mes tiene ingreso manual, solo contar el manual (no duplicar con pagos por unidad)
+      if (mesesConManual.has(mes) && !p.manual) return;
       meses[mes].ingresos += Number(p.monto||0);
     });
     egresosSnap.forEach(d => {
