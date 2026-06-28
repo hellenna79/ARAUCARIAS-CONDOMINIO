@@ -324,6 +324,42 @@ function mostrarPanel() {
 
 // ===================== RESIDENTES =====================
 // ===== EXPORTAR RESIDENTES EXCEL =====
+function filtrarResidentes() {
+  const q = (document.getElementById('buscar-residente')?.value||'').toLowerCase().trim();
+  const docs = Object.values(window._resMap||{});
+  const filtrados = q ? docs.filter(r => 
+    String(r.unidad||'').includes(q) || 
+    (r.nombre||'').toLowerCase().includes(q)
+  ) : docs;
+  filtrados.sort((a,b) => parseInt(a.unidad||0) - parseInt(b.unidad||0));
+  renderResidentes(filtrados);
+}
+
+function renderResidentes(docs) {
+  const rolColor = t => t==='Propietario'?'#1a5276':t==='Arrendatario'?'#6c3483':t==='Corredora'?'#0e6655':'#888';
+  let html = '<table><thead><tr><th><input type="checkbox" id="sel-todos" onchange="seleccionarTodos(this)"></th><th>Unidad</th><th>Nombre</th><th>Rol</th><th>Correo</th><th>Acciones</th></tr></thead><tbody>';
+  if (!docs.length) {
+    html += '<tr><td colspan="6" style="padding:24px;text-align:center;color:#999">Sin resultados</td></tr>';
+  }
+  docs.forEach(r => {
+    const rc = rolColor(r.tipo||'');
+    html += `<tr>
+      <td><input type="checkbox" class="sel-residente" value="${r._id}" data-correo="${r.correo||''}" data-nombre="${r.nombre||''}"></td>
+      <td><strong>${r.unidad||'—'}</strong></td>
+      <td>${r.nombre||'—'}</td>
+      <td><span style="background:${rc};color:white;padding:2px 8px;border-radius:10px;font-size:11px">${r.tipo||'—'}</span></td>
+      <td>${r.correo?'<a href="mailto:'+r.correo+'" style="color:var(--verde4)">'+r.correo+'</a>':'<span style="color:#999">Sin correo</span>'}</td>
+      <td style="white-space:nowrap">
+        <button style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="editarResidenteId('${r._id}')">✏️</button>
+        <button style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="eliminarResidente('${r._id}','${(r.nombre||'').replace(/'/g,'')}')">🗑️</button>
+        <button style="background:#0e6655;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px" onclick="enviarCorreoUnidad('${r._id}')">📧</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('lista-residentes').innerHTML = html;
+}
+
 function eliminarTodosResidentes() {
   if (!confirm('¿Eliminar TODOS los residentes? Esto no se puede deshacer.')) return;
   db.collection('residentes').get().then(snap => {
@@ -428,6 +464,10 @@ function mostrarResidentes() {
       <button class="btn" style="background:#6c3483;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="abrirImportarExcel()">📥 Importar Excel</button>
       <button class="btn" style="background:#0e6655;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="abrirEnvioMasivo()">📧 Envío masivo</button>
     </div>
+    <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+      <input id="buscar-residente" type="text" placeholder="Buscar por unidad o nombre..." style="padding:9px 12px;border:1px solid var(--borde);border-radius:8px;font-size:13px;width:280px" oninput="filtrarResidentes()">
+      <button class="btn btn-outline" onclick="document.getElementById('buscar-residente').value='';filtrarResidentes()">✖ Limpiar</button>
+    </div>
     <div class="tabla-wrap">
       <div class="tabla-header"><h3>Listado de residentes</h3></div>
       <div id="lista-residentes"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>
@@ -463,7 +503,7 @@ function mostrarResidentes() {
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="document.getElementById('modal-excel').style.display='none'">Cancelar</button>
-          <button id="btn-importar" class="btn btn-verde" style="display:none" onclick="confirmarImportacionExcel()">✅ Importar</button>
+          <button id="btn-importar" class="btn btn-verde" style="display:none" onclick="ejecutarImportacion()">✅ Importar</button>
         </div>
       </div>
     </div>
@@ -504,7 +544,14 @@ function cargarResidentes() {
     snap.forEach(d => docs.push({...d.data(), _id: d.id}));
     window._resMap = {}; docs.forEach(d=>window._resMap[d._id]=d);
     docs.sort((a,b) => parseInt(a.unidad||0) - parseInt(b.unidad||0));
-    let html = '<table><thead><tr><th><input type="checkbox" id="sel-todos" onchange="seleccionarTodos(this)"></th><th>Unidad</th><th>Nombre</th><th>Rol</th><th>Correo</th><th>Acciones</th></tr></thead><tbody>';
+    window._resMap = {}; docs.forEach(d=>window._resMap[d._id]=d);
+    renderResidentes(docs);
+  }).catch(() => {
+    document.getElementById('lista-residentes').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Error al cargar residentes</div>';
+  });
+}
+function _cargarResidentesLegacy(docs) {
+    let html = 'UNUSED';
     docs.forEach(r => {
       const total = (r.deuda||0)+(r.intereses||0);
       const estadoBadge = total > 0 ? '<span class="badge badge-rojo">En mora</span>' : '<span class="badge badge-verde">Al día</span>';
@@ -3811,18 +3858,16 @@ function procesarFilasExcel(filas){
       <thead><tr style="background:#6c3483;color:white">
         <th style="padding:6px 10px;text-align:left">Unidad</th>
         <th style="padding:6px 10px;text-align:left">Nombre</th>
-        <th style="padding:6px 10px;text-align:left">RUT</th>
+        <th style="padding:6px 10px;text-align:left">Rol</th>
         <th style="padding:6px 10px;text-align:left">Correo</th>
         <th style="padding:6px 10px;text-align:left">Teléfono</th>
-        <th style="padding:6px 10px;text-align:right">Deuda</th>
       </tr></thead>
       <tbody>${preview.map((r,i)=>`<tr style="background:${i%2===0?'#f9f9f9':'white'}">
         <td style="padding:5px 10px">${r.unidad}</td>
         <td style="padding:5px 10px">${r.nombre}</td>
-        <td style="padding:5px 10px">${r.rut}</td>
+        <td style="padding:5px 10px">${r.tipo||'—'}</td>
         <td style="padding:5px 10px">${r.correo}</td>
         <td style="padding:5px 10px">${r.telefono}</td>
-        <td style="padding:5px 10px;text-align:right">$${r.deuda.toLocaleString('es-CL')}</td>
       </tr>`).join('')}</tbody>
     </table>
   `;
