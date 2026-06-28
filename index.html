@@ -948,6 +948,120 @@ function sincronizarAbonosDesdeRecaudacion() {
 }
 
 // ===== NUEVO PAGO DIRECTO EN GASTOS COMUNES =====
+// ===== ENVÍO DE COBRO DESDE GASTOS COMUNES =====
+function enviarCobroUnidad(unidad, residente, cobrado, pagado, interes) {
+  const saldo = cobrado + interes - pagado;
+  if (saldo <= 0) { alert('La unidad ' + unidad + ' no tiene deuda pendiente'); return; }
+  
+  // Buscar correo del residente
+  db.collection('residentes').where('unidad','==',String(unidad)).get().then(snap => {
+    let correo = '';
+    snap.forEach(d => { if (!correo && d.data().correo) correo = d.data().correo; });
+    if (!correo) { alert('La unidad ' + unidad + ' no tiene correo registrado'); return; }
+    
+    const asunto = 'Aviso de deuda — Unidad ' + unidad + ' — Condominio Las Araucarias';
+    const mensaje = 'Estimado/a ' + residente + ',
+
+' +
+      'Le informamos que registra el siguiente saldo pendiente en Condominio Las Araucarias:
+
+' +
+      '• Total cobrado: $' + cobrado.toLocaleString('es-CL') + '
+' +
+      (interes > 0 ? '• Intereses: $' + interes.toLocaleString('es-CL') + '
+' : '') +
+      '• Total abonado: $' + pagado.toLocaleString('es-CL') + '
+' +
+      '• Saldo pendiente: $' + saldo.toLocaleString('es-CL') + '
+
+' +
+      'Le solicitamos regularizar su situación a la brevedad.
+
+' +
+      'Saludos,
+Administración Condominio Las Araucarias';
+
+    if (!confirm('Enviar cobro a ' + residente + ' (' + correo + ')?
+Saldo: $' + saldo.toLocaleString('es-CL'))) return;
+    
+    emailjs.init({publicKey: '33UWFIBc9PKG4WTEy'});
+    emailjs.send('service_h8lfgpi', 'template_y2hoicq', {
+      to_email: correo,
+      to_name: residente,
+      subject: asunto,
+      message: mensaje,
+      nombre: residente,
+      mensaje: mensaje
+    }).then(() => alert('✅ Correo enviado a ' + correo))
+      .catch(e => alert('Error: ' + (e.text||e.message||JSON.stringify(e))));
+  });
+}
+
+function enviarCobroMasivo() {
+  const morosos = GASTOS_JUNIO_2026.filter(g => {
+    const cobrado = g.capitalAtrasado + g.totalMes;
+    const saldo = cobrado + g.intereses - g.abonos;
+    return saldo > 0;
+  });
+  
+  if (!morosos.length) { alert('No hay unidades con deuda pendiente'); return; }
+  if (!confirm('Enviar cobro a ' + morosos.length + ' unidades con deuda?')) return;
+
+  emailjs.init({publicKey: '33UWFIBc9PKG4WTEy'});
+  let enviados = 0, sinCorreo = 0, errores = 0;
+  
+  const procesarSiguiente = (i) => {
+    if (i >= morosos.length) {
+      alert('✅ Proceso completado:
+• Enviados: ' + enviados + '
+• Sin correo: ' + sinCorreo + '
+• Errores: ' + errores);
+      return;
+    }
+    const g = morosos[i];
+    const cobrado = g.capitalAtrasado + g.totalMes;
+    const saldo = cobrado + g.intereses - g.abonos;
+    
+    db.collection('residentes').where('unidad','==',String(g.unidad)).get().then(snap => {
+      let correo = '';
+      snap.forEach(d => { if (!correo && d.data().correo) correo = d.data().correo; });
+      
+      if (!correo) { sinCorreo++; procesarSiguiente(i+1); return; }
+      
+      const asunto = 'Aviso de deuda — Unidad ' + g.unidad + ' — Condominio Las Araucarias';
+      const mensaje = 'Estimado/a ' + g.residente + ',
+
+' +
+        'Le informamos que registra el siguiente saldo pendiente:
+
+' +
+        '• Total cobrado: $' + cobrado.toLocaleString('es-CL') + '
+' +
+        (g.intereses > 0 ? '• Intereses: $' + g.intereses.toLocaleString('es-CL') + '
+' : '') +
+        '• Total abonado: $' + g.abonos.toLocaleString('es-CL') + '
+' +
+        '• Saldo pendiente: $' + saldo.toLocaleString('es-CL') + '
+
+' +
+        'Le solicitamos regularizar su situación a la brevedad.
+
+' +
+        'Saludos,
+Administración Condominio Las Araucarias';
+      
+      emailjs.send('service_h8lfgpi', 'template_y2hoicq', {
+        to_email: correo, to_name: g.residente,
+        subject: asunto, message: mensaje,
+        nombre: g.residente, mensaje: mensaje
+      }).then(() => { enviados++; procesarSiguiente(i+1); })
+        .catch(() => { errores++; procesarSiguiente(i+1); });
+    });
+  };
+  
+  procesarSiguiente(0);
+}
+
 function abrirModalNuevoPago(unidadPresel) {
   const unidadInput = document.getElementById('np-unidad');
   if (unidadPresel) unidadInput.value = unidadPresel;
@@ -1178,6 +1292,7 @@ function mostrarGastos() {
         </button>
         <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
         <button class="btn btn-verde" onclick="abrirModalNuevoPago()">+ Nuevo pago</button>
+      <button class="btn" style="background:#0e6655;color:white;border:none" onclick="enviarCobroMasivo()">📧 Cobro a morosos</button>
       </div>
     </div>
     <div class="tabla-wrap">
@@ -1333,6 +1448,7 @@ function renderGastosTabla() {
       <td style="padding:10px 12px;text-align:right;font-weight:700;color:${saldoColor}">${saldoTexto}</td>
       <td style="padding:10px 12px;text-align:center;white-space:nowrap">
         <button class="btn btn-sm" style="background:#e8f5ee;color:var(--verde4);border:1px solid var(--borde);font-size:12px;margin-right:4px" onclick="event.stopPropagation();verHistorialUnidad('${g.unidad}')">📋 Ver</button><button class="btn btn-sm" style="background:#1a7a4a;color:white;border:none;font-size:12px" onclick="event.stopPropagation();abrirModalNuevoPago('${g.unidad}')">+ Pago</button>
+        <button class="btn btn-sm" style="background:#0e6655;color:white;border:none;font-size:11px" onclick="event.stopPropagation();enviarCobroUnidad('${g.unidad}','${g.residente}',${cobrado},${pagado},${interes})">📧</button>
       </td>
     </tr>`;
   });
