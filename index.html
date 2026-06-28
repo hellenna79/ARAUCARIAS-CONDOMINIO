@@ -3860,34 +3860,37 @@ function mostrarStatusExcel(msg, color){
 }
 
 async function ejecutarImportacion(){
-  if(!excelDatosParaImportar.length){ return; }
-  mostrarStatusExcel('⏳ Importando datos...','#2980b9');
+  if(!excelDatosParaImportar.length){ alert('No hay datos para importar'); return; }
+  mostrarStatusExcel('⏳ Importando ' + excelDatosParaImportar.length + ' registros...','#2980b9');
   document.getElementById('btn-importar').disabled=true;
   
-  let ok=0, err=0;
+  const batch = db.batch();
+  let ok=0;
   for(const r of excelDatosParaImportar){
-    try{
-      // Buscar si ya existe esa unidad
-      const snap = await db.collection('residentes').where('unidad','==',r.unidad).get();
-      if(!snap.empty){
-        // Actualizar (merge) el existente
-        await snap.docs[0].ref.update({
-          nombre: r.nombre,
-          rut: r.rut || snap.docs[0].data().rut || '',
-          correo: r.correo || snap.docs[0].data().correo || '',
-          telefono: r.telefono || snap.docs[0].data().telefono || '',
-          deuda: r.deuda || snap.docs[0].data().deuda || 0
-        });
-      } else {
-        await db.collection('residentes').add(r);
-      }
-      ok++;
-    } catch(e){ err++; }
+    const ref = db.collection('residentes').doc();
+    batch.set(ref, {
+      unidad: String(r.unidad||''),
+      nombre: String(r.nombre||''),
+      tipo: String(r.tipo||'Propietario'),
+      correo: String(r.correo||''),
+      telefono: String(r.telefono||''),
+      rut: String(r.rut||''),
+      deuda: 0,
+      intereses: 0,
+      estado: 'Al día'
+    });
+    ok++;
   }
   
-  document.getElementById('btn-importar').disabled=false;
-  mostrarStatusExcel(`✅ Importación completada: <strong>${ok} registros</strong> procesados${err>0?`, ${err} errores`:''}. <a href="#" onclick="document.getElementById('modal-excel').style.display='none';mostrarResidentes();" style="color:#6c3483">Ver residentes →</a>`,'#27ae60');
-  excelDatosParaImportar = [];
+  try {
+    await batch.commit();
+    document.getElementById('btn-importar').disabled=false;
+    mostrarStatusExcel('✅ ' + ok + ' residentes importados correctamente. <a href="#" onclick="document.getElementById('modal-excel').style.display='none';mostrarResidentes();" style="color:#6c3483">Ver residentes →</a>','#27ae60');
+    excelDatosParaImportar = [];
+  } catch(e) {
+    document.getElementById('btn-importar').disabled=false;
+    mostrarStatusExcel('❌ Error al importar: ' + e.message, '#e74c3c');
+  }
 }
 
 
