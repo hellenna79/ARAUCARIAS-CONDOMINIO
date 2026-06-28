@@ -3789,6 +3789,13 @@ function mostrarConciliacion() {
   cargarConciliacion2();
 }
 
+function eliminarMovConc(id, coleccion) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  db.collection(coleccion).doc(id).delete()
+    .then(() => { cargarConciliacion2(); })
+    .catch(e => alert('Error: ' + e.message));
+}
+
 function abrirModalIngresoConciliacion() {
   document.getElementById('ci-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('ci-desc').value = '';
@@ -3843,8 +3850,8 @@ function cargarConciliacion2() {
       const p = d.data();
       if(!p.fecha||p.fecha<inicio||p.fecha>fin||p.tipo==='Ajuste') return;
       const m = Number(p.monto||0);
-      if(esBanco(p.forma)){ banco.push({f:p.fecha,desc:`Pago GC U${p.unidad||''} - ${p.concepto||''}`,ing:m,egr:0}); ingB+=m; }
-      else { caja.push({f:p.fecha,desc:`Pago efectivo U${p.unidad||''} - ${p.concepto||''}`,ing:m,egr:0}); ingC+=m; }
+      if(esBanco(p.forma)){ banco.push({f:p.fecha,desc:`Pago GC U${p.unidad||''} - ${p.concepto||''}`,ing:m,egr:0,id:d.id,col:'pagos'}); ingB+=m; }
+      else { caja.push({f:p.fecha,desc:`Pago efectivo U${p.unidad||''} - ${p.concepto||''}`,ing:m,egr:0,id:d.id,col:'pagos'}); ingC+=m; }
     });
     eSnap.forEach(d => {
       const e = d.data();
@@ -3852,8 +3859,8 @@ function cargarConciliacion2() {
       // Ajuste/Compensación NO afecta banco ni caja
       if((e.forma||'').toLowerCase().includes('ajuste')||(e.formaPago||'').toLowerCase().includes('ajuste')) return;
       const m = Number(e.monto||0);
-      if(esBanco(e.forma||e.formaPago||'')){ banco.push({f:e.fecha,desc:`Egreso - ${e.descripcion||e.categoria||''}`,ing:0,egr:m}); egrB+=m; }
-      else { caja.push({f:e.fecha,desc:`Egreso efvo - ${e.descripcion||e.categoria||''}`,ing:0,egr:m}); egrC+=m; }
+      if(esBanco(e.forma||e.formaPago||'')){ banco.push({f:e.fecha,desc:`Egreso - ${e.descripcion||e.categoria||''}`,ing:0,egr:m,id:d.id,col:'egresos'}); egrB+=m; }
+      else { caja.push({f:e.fecha,desc:`Egreso efvo - ${e.descripcion||e.categoria||''}`,ing:0,egr:m,id:d.id,col:'egresos'}); egrC+=m; }
     });
 
     function renderT(movs, tbodyId, totalId) {
@@ -3869,6 +3876,7 @@ function cargarConciliacion2() {
           <td style="padding:7px 8px;text-align:right;font-size:12px;color:#1a7a4a">${m.ing>0?'$'+m.ing.toLocaleString('es-CL'):''}</td>
           <td style="padding:7px 8px;text-align:right;font-size:12px;color:#c0392b">${m.egr>0?'-$'+m.egr.toLocaleString('es-CL'):''}</td>
           <td style="padding:7px 8px;text-align:right;font-size:12px;font-weight:600">$${saldo.toLocaleString('es-CL')}</td>
+          <td style="padding:4px 8px">${m.id?`<button onclick="eliminarMovConc('${m.id}','${m.col||'pagos'}')" style="background:#fee2e2;color:#dc2626;border:none;padding:2px 8px;border-radius:5px;cursor:pointer;font-size:11px">✖</button>`:''}</td>
         </tr>`;
       });
       if(!movs.length) rows=`<tr><td colspan="5" style="padding:16px;text-align:center;color:#999;font-size:12px">Sin movimientos</td></tr>`;
