@@ -424,7 +424,7 @@ function enviarCorreos() {
   if (!asunto || !cuerpo) { alert('Ingresa asunto y mensaje'); return; }
   if (lista.length === 0) { alert('Sin destinatarios'); return; }
   // Verificar EmailJS configurado
-  const serviceId = 'service_h8lfgpl';
+  const serviceId = 'service_h8lfgpi';
   const templateId = 'template_y2hoicq';
   const publicKey = '33UWFIBc9PKG4WTEy';
   try { emailjs.init({publicKey: publicKey}); } catch(e) { alert('Error init EmailJS: ' + e.message); return; }
