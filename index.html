@@ -959,27 +959,16 @@ function enviarCobroUnidad(unidad, residente, cobrado, pagado, interes) {
     snap.forEach(d => { if (!correo && d.data().correo) correo = d.data().correo; });
     if (!correo) { alert('La unidad ' + unidad + ' no tiene correo registrado'); return; }
     
-    const asunto = 'Aviso de deuda — Unidad ' + unidad + ' — Condominio Las Araucarias';
-    const mensaje = 'Estimado/a ' + residente + ',
-
-' +
-      'Le informamos que registra el siguiente saldo pendiente en Condominio Las Araucarias:
-
-' +
-      '• Total cobrado: $' + cobrado.toLocaleString('es-CL') + '
-' +
-      (interes > 0 ? '• Intereses: $' + interes.toLocaleString('es-CL') + '
-' : '') +
-      '• Total abonado: $' + pagado.toLocaleString('es-CL') + '
-' +
-      '• Saldo pendiente: $' + saldo.toLocaleString('es-CL') + '
-
-' +
-      'Le solicitamos regularizar su situación a la brevedad.
-
-' +
-      'Saludos,
-Administración Condominio Las Araucarias';
+    const asunto = 'Aviso de deuda - Unidad ' + unidad + ' - Condominio Las Araucarias';
+    const nl = '\n';
+    const mensaje = 'Estimado/a ' + residente + ',' + nl + nl +
+      'Le informamos que registra el siguiente saldo pendiente en Condominio Las Araucarias:' + nl + nl +
+      'Total cobrado: $' + cobrado.toLocaleString('es-CL') + nl +
+      (interes > 0 ? 'Intereses: $' + interes.toLocaleString('es-CL') + nl : '') +
+      'Total abonado: $' + pagado.toLocaleString('es-CL') + nl +
+      'Saldo pendiente: $' + saldo.toLocaleString('es-CL') + nl + nl +
+      'Le solicitamos regularizar su situacion a la brevedad.' + nl + nl +
+      'Saludos, Administracion Condominio Las Araucarias';
 
     if (!confirm('Enviar cobro a ' + residente + ' (' + correo + ')?
 Saldo: $' + saldo.toLocaleString('es-CL'))) return;
@@ -1028,27 +1017,16 @@ function enviarCobroMasivo() {
       
       if (!correo) { sinCorreo++; procesarSiguiente(i+1); return; }
       
-      const asunto = 'Aviso de deuda — Unidad ' + g.unidad + ' — Condominio Las Araucarias';
-      const mensaje = 'Estimado/a ' + g.residente + ',
-
-' +
-        'Le informamos que registra el siguiente saldo pendiente:
-
-' +
-        '• Total cobrado: $' + cobrado.toLocaleString('es-CL') + '
-' +
-        (g.intereses > 0 ? '• Intereses: $' + g.intereses.toLocaleString('es-CL') + '
-' : '') +
-        '• Total abonado: $' + g.abonos.toLocaleString('es-CL') + '
-' +
-        '• Saldo pendiente: $' + saldo.toLocaleString('es-CL') + '
-
-' +
-        'Le solicitamos regularizar su situación a la brevedad.
-
-' +
-        'Saludos,
-Administración Condominio Las Araucarias';
+      const asunto = 'Aviso de deuda - Unidad ' + g.unidad + ' - Condominio Las Araucarias';
+      const nl = '\n';
+      const mensaje = 'Estimado/a ' + g.residente + ',' + nl + nl +
+        'Le informamos que registra el siguiente saldo pendiente:' + nl + nl +
+        'Total cobrado: $' + cobrado.toLocaleString('es-CL') + nl +
+        (g.intereses > 0 ? 'Intereses: $' + g.intereses.toLocaleString('es-CL') + nl : '') +
+        'Total abonado: $' + g.abonos.toLocaleString('es-CL') + nl +
+        'Saldo pendiente: $' + saldo.toLocaleString('es-CL') + nl + nl +
+        'Le solicitamos regularizar su situacion a la brevedad.' + nl + nl +
+        'Saludos, Administracion Condominio Las Araucarias';
       
       emailjs.send('service_h8lfgpi', 'template_y2hoicq', {
         to_email: correo, to_name: g.residente,
