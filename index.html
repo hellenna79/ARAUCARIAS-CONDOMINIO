@@ -2306,7 +2306,14 @@ function guardarMovBanco() {
 function mostrarFlujoCaja() {
   const c = document.getElementById('content');
   c.innerHTML = `<div id="flujo-content"><div style="padding:24px;text-align:center;color:#999">Cargando...</div></div>`;
-  Promise.all([db.collection('pagos').get(), db.collection('egresos').get()]).then(([pagosSnap, egresosSnap]) => {
+  Promise.all([
+    db.collection('pagos').get(),
+    db.collection('egresos').get(),
+    db.collection('conciliacion_config').get()
+  ]).then(([pagosSnap, egresosSnap, cfgSnap]) => {
+    // Sumar todos los saldos iniciales registrados
+    let saldoInicial = 0;
+    cfgSnap.forEach(d => { saldoInicial += Number(d.data().saldoBanco||0) + Number(d.data().saldoCaja||0); });
     const meses = {};
     // Detectar meses con ingreso manual (total mensual ingresado en conciliación)
     const mesesConManual = new Set();
@@ -2337,6 +2344,11 @@ function mostrarFlujoCaja() {
     let html = `<div class="tabla-wrap"><div class="tabla-header"><h3>Flujo de Caja</h3></div>
     <table><thead><tr><th>Período</th><th>Ingresos</th><th>Egresos</th><th>Resultado</th><th>Saldo acumulado</th></tr></thead><tbody>`;
     if (claves.length===0) { html += '<tr><td colspan="5" style="text-align:center;padding:24px;color:#999">Sin movimientos registrados</td></tr>'; }
+    // Fila saldo inicial
+    if (saldoInicial > 0) {
+      saldoAcum = saldoInicial;
+      html += '<tr style="background:#e8f5ee"><td><strong>Saldo inicial 2025</strong></td><td style="color:var(--verde);font-weight:600">$' + saldoInicial.toLocaleString('es-CL') + '</td><td>—</td><td>—</td><td style="font-weight:700">$' + saldoInicial.toLocaleString('es-CL') + '</td></tr>';
+    }
     claves.forEach(mes => {
       const {ingresos, egresos} = meses[mes];
       const resultado = ingresos - egresos;
