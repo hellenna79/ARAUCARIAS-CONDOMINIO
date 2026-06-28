@@ -427,7 +427,8 @@ function enviarCorreos() {
   const serviceId = 'service_h8lfgpl';
   const templateId = 'template_y2hoicq';
   const publicKey = '33UWFIBc9PKG4WTEy';
-  emailjs.init({publicKey: publicKey});
+  try { emailjs.init({publicKey: publicKey}); } catch(e) { alert('Error init EmailJS: ' + e.message); return; }
+  alert('EmailJS iniciado OK. Enviando a: ' + lista[0].correo);
   let enviados = 0, errores = 0;
   const btn = document.getElementById('btn-enviar-correos');
   btn.disabled = true; btn.textContent = 'Enviando...';
@@ -450,7 +451,7 @@ function enviarCorreos() {
       title: asunto,
       name: 'Condominio Las Araucarias'
     }).then(() => { enviados++; enviarSiguiente(i+1); })
-      .catch(() => { errores++; enviarSiguiente(i+1); });
+      .catch(e => { errores++; alert('Error enviando a ' + dest.correo + ': ' + e.text || e.message || JSON.stringify(e)); enviarSiguiente(i+1); });
   };
   enviarSiguiente(0);
 }
