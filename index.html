@@ -550,31 +550,7 @@ function cargarResidentes() {
     document.getElementById('lista-residentes').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Error al cargar residentes</div>';
   });
 }
-function _cargarResidentesLegacy(docs) {
-    let html = 'UNUSED';
-    docs.forEach(r => {
-      const total = (r.deuda||0)+(r.intereses||0);
-      const estadoBadge = total > 0 ? '<span class="badge badge-rojo">En mora</span>' : '<span class="badge badge-verde">Al día</span>';
-      const rolColor = r.tipo==='Propietario'?'#1a5276':r.tipo==='Arrendatario'?'#6c3483':'#0e6655';
-      html += `<tr>
-        <td><input type="checkbox" class="sel-residente" value="${r._id}" data-correo="${r.correo||''}" data-nombre="${r.nombre||''}"></td>
-        <td><strong>${r.unidad||'—'}</strong></td>
-        <td>${r.nombre||'—'}</td>
-        <td><span style="background:${rolColor};color:white;padding:2px 8px;border-radius:10px;font-size:11px">${r.tipo||'—'}</span></td>
-        <td>${r.correo?'<a href="mailto:'+r.correo+'" style="color:var(--verde4)">'+r.correo+'</a>':'<span style="color:#999">Sin correo</span>'}</td>
-        <td style="white-space:nowrap">
-          <button style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="editarResidenteId('${r._id}')">✏️ Editar</button>
-          <button style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px" onclick="eliminarResidente('${r._id}','${(r.nombre||'').replace(/'/g,'')}')">🗑️</button>
-          <button style="background:#0e6655;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px" onclick="enviarCorreoUnidad('${r._id}')">📧</button>
-        </td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-    document.getElementById('lista-residentes').innerHTML = html;
-  }).catch(() => {
-    document.getElementById('lista-residentes').innerHTML = '<div style="padding:24px;text-align:center;color:#999">Error al cargar residentes</div>';
-  });
-}
+
 
 function abrirModalResidente() {
   const m = document.getElementById('modal-residente');
