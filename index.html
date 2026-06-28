@@ -970,8 +970,7 @@ function enviarCobroUnidad(unidad, residente, cobrado, pagado, interes) {
       'Le solicitamos regularizar su situacion a la brevedad.' + nl + nl +
       'Saludos, Administracion Condominio Las Araucarias';
 
-    if (!confirm('Enviar cobro a ' + residente + ' (' + correo + ')?
-Saldo: $' + saldo.toLocaleString('es-CL'))) return;
+    if (!confirm('Enviar cobro a ' + residente + ' (' + correo + ')? Saldo: $' + saldo.toLocaleString('es-CL'))) return;
     
     emailjs.init({publicKey: '33UWFIBc9PKG4WTEy'});
     emailjs.send('service_h8lfgpi', 'template_y2hoicq', {
