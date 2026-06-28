@@ -1000,10 +1000,7 @@ function enviarCobroMasivo() {
   
   const procesarSiguiente = (i) => {
     if (i >= morosos.length) {
-      alert('✅ Proceso completado:
-• Enviados: ' + enviados + '
-• Sin correo: ' + sinCorreo + '
-• Errores: ' + errores);
+      alert('Proceso completado. Enviados: ' + enviados + '. Sin correo: ' + sinCorreo + '. Errores: ' + errores);
       return;
     }
     const g = morosos[i];
