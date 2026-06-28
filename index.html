@@ -427,7 +427,7 @@ function enviarCorreos() {
   const serviceId = 'service_h8lfgpl';
   const templateId = 'template_y2hoicq';
   const publicKey = '33UWFIBc9PKG4WTEy';
-  emailjs.init(publicKey);
+  emailjs.init({publicKey: publicKey});
   let enviados = 0, errores = 0;
   const btn = document.getElementById('btn-enviar-correos');
   btn.disabled = true; btn.textContent = 'Enviando...';
