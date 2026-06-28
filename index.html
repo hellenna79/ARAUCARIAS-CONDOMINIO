@@ -895,6 +895,7 @@ function verHistorialUnidad(unidad) {
   panel.appendChild(resumenDiv);
   panel.appendChild(histDiv);
   document.getElementById('content').appendChild(panel);
+  setTimeout(() => panel.scrollIntoView({behavior:'smooth', block:'start'}), 100);
 
   db.collection('pagos').where('unidad','==',String(unidad)).get()
     .then(snap => {
