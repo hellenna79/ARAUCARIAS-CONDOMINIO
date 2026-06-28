@@ -959,6 +959,41 @@ function abrirModalNuevoPago(unidadPresel) {
 function cerrarModalNuevoPago() {
   document.getElementById('modal-nuevo-pago').style.display = 'none';
 }
+// ===== ASIENTO CONTABLE AUTOMÁTICO =====
+function generarAsientoContable(tipo, datos) {
+  // tipo: 'ingreso' o 'egreso'
+  // No generar para ajuste/compensación
+  const forma = (datos.forma||'').toLowerCase();
+  if (forma.includes('ajuste') || forma.includes('compensaci')) return;
+
+  let cuentaDebe, cuentaHaber, glosa;
+  const esBanco = forma.includes('transfer') || forma.includes('cheque') || forma.includes('débito') || forma.includes('debito');
+
+  if (tipo === 'ingreso') {
+    cuentaDebe = esBanco ? 'Banco Estado' : 'Caja Chica';
+    cuentaHaber = 'Ingresos por Gastos Comunes';
+    glosa = 'Pago GC Unidad ' + (datos.unidad||'') + ' - ' + (datos.concepto||'Abono gasto común');
+  } else {
+    cuentaDebe = datos.categoria || 'Gastos de Administración';
+    cuentaHaber = esBanco ? 'Banco Estado' : 'Caja Chica';
+    glosa = (datos.descripcion||datos.proveedor||'Egreso') + (datos.categoria ? ' - ' + datos.categoria : '');
+  }
+
+  const asiento = {
+    fecha: datos.fecha || new Date().toISOString().split('T')[0],
+    glosa: glosa,
+    cuentaDebe: cuentaDebe,
+    montoDebe: datos.monto,
+    cuentaHaber: cuentaHaber,
+    montoHaber: datos.monto,
+    documento: datos.documento || '',
+    origen: tipo,
+    auto: true
+  };
+
+  db.collection('libro_diario').add(asiento).catch(e => console.warn('Error asiento:', e));
+}
+
 function guardarNuevoPago() {
   const unidad = document.getElementById('np-unidad').value.trim();
   const monto = Number(document.getElementById('np-monto').value);
@@ -975,14 +1010,14 @@ function guardarNuevoPago() {
   // 2. Guardar en Firestore
   const datos = { unidad, monto, fecha, concepto, forma, tipo: 'Pago' };
   db.collection('pagos').add(datos).then(() => {
+    // Generar asiento contable automático
+    generarAsientoContable('ingreso', {unidad, monto, fecha, concepto, forma});
     cerrarModalNuevoPago();
     renderGastosTabla();
-    // Mostrar historial si está abierto
     const hist = document.getElementById('historial-unidad-' + unidad);
     if (hist) verHistorialUnidad(unidad);
     alert('✅ Pago registrado — Unidad ' + unidad + ': $' + monto.toLocaleString('es-CL'));
   }).catch(e => {
-    // Aunque falle Firestore, el abono ya está en la tabla
     cerrarModalNuevoPago();
     renderGastosTabla();
     console.warn('Firestore falló pero abono aplicado localmente:', e);
@@ -2105,7 +2140,7 @@ function guardarEgreso() {
     const op = _editEgresoId
       ? db.collection('egresos').doc(_editEgresoId).update(datosFinales)
       : db.collection('egresos').add(datosFinales);
-    op.then(() => { cerrarModalEgreso(); cargarEgresos(); }).catch(e => alert('Error: '+e.message));
+    op.then(() => { generarAsientoContable('egreso', datosFinales); cerrarModalEgreso(); cargarEgresos(); }).catch(e => alert('Error: '+e.message));
   };
   if (_comprobanteFile) {
     const reader = new FileReader();
