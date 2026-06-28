@@ -2516,7 +2516,15 @@ function mostrarFlujoCaja() {
     let saldoInicial = 0;
     cfgSnap.forEach(d => { saldoInicial += Number(d.data().saldoBanco||0) + Number(d.data().saldoCaja||0); });
     const meses = {};
-    // Sumar TODOS los pagos por mes (manuales + reales), excluyendo ajustes
+    // Para cada mes: sumar manual (si existe) + pagos reales por unidad específica
+    // Los pagos manuales (unidad:'—') son totales históricos
+    // Los pagos por unidad son pagos nuevos registrados en gastos comunes
+    const mesesConManual = new Set();
+    pagosSnap.forEach(d => {
+      const p = d.data();
+      if (p.manual && p.fecha) mesesConManual.add(p.fecha.slice(0,7));
+    });
+
     pagosSnap.forEach(d => {
       const p = d.data();
       if (!p.fecha) return;
@@ -2524,7 +2532,15 @@ function mostrarFlujoCaja() {
       if (esAjuste) return;
       const mes = p.fecha.slice(0,7);
       if (!meses[mes]) meses[mes] = {ingresos:0, egresos:0};
-      meses[mes].ingresos += Number(p.monto||0);
+      // Si el mes tiene manual: sumar el manual + solo pagos con unidad real (no '—')
+      if (mesesConManual.has(mes)) {
+        if (p.manual || (p.unidad && p.unidad !== '—' && !p.manual)) {
+          meses[mes].ingresos += Number(p.monto||0);
+        }
+      } else {
+        // Mes sin manual: sumar todos
+        meses[mes].ingresos += Number(p.monto||0);
+      }
     });
     egresosSnap.forEach(d => {
       const e = d.data();
