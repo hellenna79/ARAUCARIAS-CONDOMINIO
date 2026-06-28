@@ -3715,6 +3715,17 @@ function calcularQuorum() {
 let excelDatosParaImportar = [];
 
 function abrirImportarExcel(){
+  // Usar el input directo del HTML estático
+  const inp = document.getElementById('excel-file-input') || document.getElementById('input-excel-residente');
+  if (inp) { inp.click(); return; }
+  // Si no existe, crearlo dinámicamente
+  const tmp = document.createElement('input');
+  tmp.type = 'file';
+  tmp.accept = '.xlsx,.xls,.csv';
+  tmp.onchange = function(e) { procesarArchivoResidente(e.target.files[0]); };
+  tmp.click();
+  return;
+  // Código original abajo (no se ejecuta)
   excelDatosParaImportar = [];
   document.getElementById('excel-file-input').value = '';
   document.getElementById('excel-preview').style.display='none';
@@ -3857,6 +3868,70 @@ function mostrarStatusExcel(msg, color){
   el.style.display='block';
   el.style.color = color||'#333';
   el.innerHTML = msg;
+}
+
+
+function procesarArchivoResidente(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      // Buscar fila encabezado
+      let startRow = 0;
+      for (let i = 0; i < Math.min(filas.length, 10); i++) {
+        const row = filas[i].map(c => String(c||'').toLowerCase());
+        if (row.some(c => c.includes('unidad')) && row.some(c => c.includes('nombre'))) {
+          startRow = i; break;
+        }
+      }
+      const headers = filas[startRow].map(c => String(c||'').toLowerCase());
+      const iU = headers.findIndex(h => h.includes('unidad'));
+      const iN = headers.findIndex(h => h.includes('nombre'));
+      const iR = headers.findIndex(h => h.includes('rol') || h.includes('tipo'));
+      const iC = headers.findIndex(h => h.includes('correo') || h.includes('email'));
+      const iT = headers.findIndex(h => h.includes('tel') || h.includes('fono'));
+      const iRut = headers.findIndex(h => h.includes('rut'));
+      
+      const registros = [];
+      for (let i = startRow+1; i < filas.length; i++) {
+        const f = filas[i];
+        const unidad = String(f[iU]||'').trim();
+        const nombre = String(f[iN]||'').trim();
+        if (!unidad || !nombre) continue;
+        let rol = iR>=0 ? String(f[iR]||'').trim() : 'Propietario';
+        if (/dueño|dueno/i.test(rol)) rol = 'Propietario';
+        else if (/arrendatario/i.test(rol)) rol = 'Arrendatario';
+        else if (/corredor/i.test(rol)) rol = 'Corredora';
+        else if (/familiar/i.test(rol)) rol = 'Familiar';
+        registros.push({
+          unidad, nombre, tipo: rol,
+          correo: iC>=0 ? String(f[iC]||'').trim() : '',
+          telefono: iT>=0 ? String(f[iT]||'').trim() : '',
+          rut: iRut>=0 ? String(f[iRut]||'').trim() : '',
+          deuda: 0, intereses: 0, estado: 'Al día'
+        });
+      }
+      
+      if (!registros.length) { alert('No se encontraron registros válidos'); return; }
+      
+      if (!confirm('Se importarán ' + registros.length + ' residentes. ¿Continuar?')) return;
+      
+      const batch = db.batch();
+      registros.forEach(r => {
+        const ref = db.collection('residentes').doc();
+        batch.set(ref, r);
+      });
+      batch.commit().then(() => {
+        alert('✅ ' + registros.length + ' residentes importados correctamente');
+        cargarResidentes();
+      }).catch(e => alert('Error: ' + e.message));
+      
+    } catch(e) { alert('Error leyendo archivo: ' + e.message); }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function cerrarModalExcelYRecargar() {
