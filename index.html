@@ -3715,14 +3715,15 @@ function calcularQuorum() {
 let excelDatosParaImportar = [];
 
 function abrirImportarExcel(){
-  // Usar el input directo del HTML estático
-  const inp = document.getElementById('excel-file-input') || document.getElementById('input-excel-residente');
-  if (inp) { inp.click(); return; }
-  // Si no existe, crearlo dinámicamente
   const tmp = document.createElement('input');
   tmp.type = 'file';
   tmp.accept = '.xlsx,.xls,.csv';
-  tmp.onchange = function(e) { procesarArchivoResidente(e.target.files[0]); };
+  tmp.style.display = 'none';
+  document.body.appendChild(tmp);
+  tmp.onchange = function(e) { 
+    procesarArchivoResidente(e.target.files[0]); 
+    document.body.removeChild(tmp);
+  };
   tmp.click();
   return;
   // Código original abajo (no se ejecuta)
@@ -3872,7 +3873,9 @@ function mostrarStatusExcel(msg, color){
 
 
 function procesarArchivoResidente(file) {
-  if (!file) return;
+  if (!file) { alert('No se seleccionó archivo'); return; }
+  if (typeof XLSX === 'undefined') { alert('Error: librería Excel no cargada. Recarga la página.'); return; }
+  alert('Leyendo archivo: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)');
   const reader = new FileReader();
   reader.onload = function(ev) {
     try {
