@@ -3681,11 +3681,29 @@ function abrirImportarExcel(){
         procesarFilasExcel(filas);
       };
       reader.readAsText(file);
-    } else {
-      // Para xlsx se necesitaría SheetJS — indicar al usuario que use CSV
-      document.getElementById('excel-status').style.display='block';
-      document.getElementById('excel-status').innerHTML = '⚠️ Para archivos .xlsx, por favor guárdalos como CSV desde Excel (Archivo → Guardar como → CSV). O bien, sube directamente un archivo CSV.';
-      document.getElementById('excel-status').style.color = '#e67e22';
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const wb = XLSX.read(ev.target.result, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const filas = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          // Buscar la fila de encabezados (puede no ser la primera)
+          let startRow = 0;
+          for (let i = 0; i < Math.min(filas.length, 10); i++) {
+            const row = filas[i].map(c => String(c||'').toLowerCase());
+            if (row.some(c => c.includes('unidad') || c.includes('nombre'))) {
+              startRow = i;
+              break;
+            }
+          }
+          procesarFilasExcel(filas.slice(startRow).map(r => r.map(c => String(c===null||c===undefined?'':c))));
+        } catch(e) { 
+          document.getElementById('excel-status').style.display='block';
+          document.getElementById('excel-status').innerHTML = '❌ Error: ' + e.message;
+        }
+      };
+      reader.readAsArrayBuffer(file);
     }
   };
 }
@@ -3701,6 +3719,7 @@ function procesarFilasExcel(filas){
   const idxUnidad = headers.findIndex(h=>h.includes('unidad'));
   const idxNombre = headers.findIndex(h=>h.includes('nombre'));
   const idxRut = headers.findIndex(h=>h.includes('rut'));
+  const idxRol = headers.findIndex(h=>h.includes('rol') || h.includes('tipo'));
   const idxCorreo = headers.findIndex(h=>h.includes('correo') || h.includes('email'));
   const idxTelefono = headers.findIndex(h=>h.includes('telefono') || h.includes('fono') || h.includes('celular'));
   const idxDeuda = headers.findIndex(h=>h.includes('deuda'));
@@ -3716,9 +3735,16 @@ function procesarFilasExcel(filas){
   for(let i=1;i<filas.length;i++){
     const fila = filas[i];
     if(!fila || fila.every(c=>!c)) continue;
+    // Normalizar rol
+    let rolRaw = idxRol>=0 ? (fila[idxRol]||'') : '';
+    if (/dueño|dueno/i.test(rolRaw)) rolRaw = 'Propietario';
+    else if (/arrendatario/i.test(rolRaw)) rolRaw = 'Arrendatario';
+    else if (/corredor/i.test(rolRaw)) rolRaw = 'Corredora';
+    else if (/familiar/i.test(rolRaw)) rolRaw = 'Familiar';
     const obj = {
-      unidad: fila[idxUnidad]||'',
+      unidad: String(fila[idxUnidad]||'').trim(),
       nombre: fila[idxNombre]||'',
+      tipo: rolRaw || 'Propietario',
       rut: idxRut>=0 ? (fila[idxRut]||'') : '',
       correo: idxCorreo>=0 ? (fila[idxCorreo]||'') : '',
       telefono: idxTelefono>=0 ? (fila[idxTelefono]||'') : '',
