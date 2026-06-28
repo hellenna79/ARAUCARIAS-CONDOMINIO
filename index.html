@@ -341,8 +341,8 @@ function exportarResidentesExcel() {
     const docs = [];
     snap.forEach(d => docs.push(d.data()));
     docs.sort((a,b) => parseInt(a.unidad||0) - parseInt(b.unidad||0));
-    const ws_data = [['Unidad','Nombre','RUT','Correo','Teléfono','Rol','Deuda']];
-    docs.forEach(r => ws_data.push([r.unidad||'',r.nombre||'',r.rut||'',r.correo||'',r.telefono||'',r.tipo||'',(r.deuda||0)+(r.intereses||0)]));
+    const ws_data = [['Unidad','Nombre','Rol','Correo','Telefono','Rut']];
+    docs.forEach(r => ws_data.push([r.unidad||'',r.nombre||'',r.tipo||'',r.correo||'',r.telefono||'',r.rut||'']));
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
     XLSX.utils.book_append_sheet(wb, ws, 'Residentes');
@@ -445,6 +445,25 @@ function mostrarResidentes() {
         <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="document.getElementById('modal-envio-masivo').style.display='none'">Cancelar</button>
           <button class="btn btn-verde" id="btn-enviar-correos" onclick="enviarCorreos()">📧 Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-excel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+      <div style="background:white;border-radius:16px;padding:28px;width:560px;max-width:94vw;max-height:90vh;overflow-y:auto">
+        <h3 style="margin-bottom:16px;color:#6c3483">📥 Importar desde CSV/Excel</h3>
+        <div style="background:#f3f0f7;border-radius:8px;padding:12px;font-size:13px;margin-bottom:14px">
+          <strong>Columnas requeridas:</strong> Unidad, Nombre, Rol, Correo, Telefono, Rut<br>
+          <span style="color:#666">Acepta archivos .xlsx y .csv</span>
+        </div>
+        <input type="file" id="excel-file-input" accept=".csv,.xlsx,.xls" style="padding:8px;border:1px solid var(--borde);border-radius:8px;width:100%;font-size:13px;margin-bottom:12px">
+        <div id="excel-status" style="display:none;padding:10px;border-radius:8px;font-size:13px;margin-bottom:10px"></div>
+        <div id="excel-preview" style="display:none;margin-bottom:12px;overflow-x:auto">
+          <div id="excel-preview-content"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="document.getElementById('modal-excel').style.display='none'">Cancelar</button>
+          <button id="btn-importar" class="btn btn-verde" style="display:none" onclick="confirmarImportacionExcel()">✅ Importar</button>
         </div>
       </div>
     </div>
