@@ -2149,12 +2149,34 @@ function enviarCartaCorreo() {
   // Extraer HTML limpio sin logo base64 (para no superar límite de EmailJS)
   const contenedorOriginal = document.getElementById('contenido-carta');
   const clon = contenedorOriginal.cloneNode(true);
-  // Eliminar imágenes con base64 (logo)
+
+  // Reemplazar encabezado con logo por encabezado limpio centrado estilo carta de aviso
+  const encabezadoViejo = clon.querySelector('div[style*="justify-content:space-between"]');
+  if (encabezadoViejo) {
+    const titulosCarta = {
+      liquidacion: 'LIQUIDACIÓN DE GASTOS COMUNES',
+      notificacion: 'NOTIFICACIÓN DE DEUDA',
+      verificacion: 'VERIFICACIÓN DE SALDO'
+    };
+    const tituloCarta = titulosCarta[tipoCarta] || 'CARTA CONDOMINIO LAS ARAUCARIAS';
+    const fechaHoy = new Date().toLocaleDateString('es-CL', {day:'numeric', month:'long', year:'numeric'});
+    const nuevoEncabezado = document.createElement('div');
+    nuevoEncabezado.style.cssText = 'text-align:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1a7a4a';
+    nuevoEncabezado.innerHTML = \`
+      <div style="font-size:17px;font-weight:700;color:#0f4a2c;letter-spacing:1px">CONDOMINIO LAS ARAUCARIAS</div>
+      <div style="font-size:12px;color:#555;margin-top:4px">Sargento Aldea 67, La Cruz, Quillota</div>
+      <div style="font-size:12px;color:#555">adm.lasaraucarias2020@gmail.com</div>
+      <div style="font-size:12px;color:#555;margin-top:4px">La Cruz, \${fechaHoy}</div>
+      <div style="font-size:15px;font-weight:700;color:#0f4a2c;margin-top:14px;text-transform:uppercase;letter-spacing:1px">\${tituloCarta}</div>
+    \`;
+    encabezadoViejo.replaceWith(nuevoEncabezado);
+  }
+
+  // Eliminar imágenes base64 restantes (timbre, etc)
   clon.querySelectorAll('img').forEach(img => {
-    if (img.src && img.src.startsWith('data:')) {
-      img.remove();
-    }
+    if (img.src && img.src.startsWith('data:')) img.remove();
   });
+
   // HTML limpio y liviano
   const cartaHtml = '<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;max-width:700px;margin:0 auto">' + clon.innerHTML + '</div>';
 
