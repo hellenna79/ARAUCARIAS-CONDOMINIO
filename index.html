@@ -192,6 +192,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// Inicialización global de EmailJS
+emailjs.init({publicKey: '33UWFIBc9PKG4WTEy'});
+
 // ===================== AUTH =====================
 function loginGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
