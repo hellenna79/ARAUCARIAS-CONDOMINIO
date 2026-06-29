@@ -2052,19 +2052,57 @@ let tipoCarta = '';
 function buscarResidentePorUnidad() {
   const unidad = document.getElementById('c-unidad').value.trim();
   if (!unidad) return;
-  db.collection('residentes').where('unidad','==',unidad).get().then(snap => {
-    if (!snap.empty) {
-      const r = snap.docs[0].data();
-      document.getElementById('c-nombre').value = r.nombre||'';
-      document.getElementById('c-deuda-base').value = r.deuda||0;
-      document.getElementById('c-intereses').value = r.intereses||0;
-      const info = document.getElementById('c-info-residente');
-      info.style.display = 'block';
-      info.innerHTML = `✅ <strong>${r.nombre}</strong> — Deuda: $${(r.deuda||0).toLocaleString('es-CL')} + Intereses: $${(r.intereses||0).toLocaleString('es-CL')}`;
+  const info = document.getElementById('c-info-residente');
+  info.style.display = 'block';
+  info.innerHTML = '⏳ Buscando...';
+
+  // 1. Buscar residente
+  db.collection('residentes').where('unidad','==',unidad).get().then(snapRes => {
+    let nombre = '';
+    let intereses = 0;
+    if (!snapRes.empty) {
+      const r = snapRes.docs[0].data();
+      nombre = r.nombre || '';
+      intereses = r.intereses || 0;
+      document.getElementById('c-nombre').value = nombre;
+      document.getElementById('c-intereses').value = intereses;
     } else {
-      document.getElementById('c-info-residente').style.display = 'block';
-      document.getElementById('c-info-residente').innerHTML = '⚠️ Unidad no encontrada en el registro de residentes';
+      info.innerHTML = '⚠️ Unidad no encontrada en el registro de residentes';
+      return;
     }
+
+    // 2. Buscar gastos comunes pendientes de esa unidad
+    db.collection('gastos_comunes').where('unidad','==',unidad).get().then(snapGC => {
+      let totalPendiente = 0;
+      let mesesPendientes = [];
+      snapGC.forEach(doc => {
+        const g = doc.data();
+        if (!g.pagado) {
+          totalPendiente += Number(g.monto) || 0;
+          if (g.mes) mesesPendientes.push(g.mes);
+        }
+      });
+
+      document.getElementById('c-deuda-base').value = totalPendiente;
+
+      // Mostrar resumen en el panel de info
+      const totalConIntereses = totalPendiente + intereses;
+      let detalleMeses = mesesPendientes.length > 0
+        ? `<br><span style="font-size:11px;color:#555">Meses pendientes: ${mesesPendientes.join(', ')}</span>`
+        : '';
+      let deudaTexto = totalPendiente > 0
+        ? `Deuda GC: <strong>$${totalPendiente.toLocaleString('es-CL')}</strong>`
+        : 'Sin deuda pendiente en GC';
+
+      info.innerHTML = `✅ <strong>${nombre}</strong> — ${deudaTexto} + Intereses: $${intereses.toLocaleString('es-CL')} = Total: <strong style="color:#c62828">$${totalConIntereses.toLocaleString('es-CL')}</strong>${detalleMeses}`;
+
+    }).catch(() => {
+      document.getElementById('c-deuda-base').value = 0;
+      info.innerHTML = `✅ <strong>${nombre}</strong> — Sin datos de gastos comunes`;
+    });
+
+  }).catch(() => {
+    info.innerHTML = '❌ Error al buscar la unidad';
   });
 }
 
