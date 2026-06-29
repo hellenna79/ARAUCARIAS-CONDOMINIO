@@ -2911,8 +2911,17 @@ function crearEventoCalendar(titulo, fecha, hora, descripcion, callback) {
   if (gcalAccessToken) {
     crearEvento();
   } else {
+    // Pedir autorización y esperar el token antes de crear
+    gcalTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPES,
+      callback: (resp) => {
+        if (resp.error) { alert('Error de autorización: ' + resp.error); return; }
+        gcalAccessToken = resp.access_token;
+        crearEvento();
+      }
+    });
     gcalTokenClient.requestAccessToken();
-    setTimeout(crearEvento, 2000);
   }
 }
 
