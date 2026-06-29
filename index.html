@@ -751,32 +751,7 @@ function imprimirEstadoCuenta() {
   const contenido = document.getElementById('contenido-estado-cuenta').innerHTML;
   const v = window.open('','_blank');
   v.document.write(`<!DOCTYPE html><html><head><title>Estado de Cuenta</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:30px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd}</style></head><body><h2>Estado de Cuenta — Condominio Las Araucarias</h2>${contenido}
-<!-- MODAL ENVÍO CORREO CARTA -->
-<div id="modal-envio-correo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
-  <div style="background:white;border-radius:12px;width:480px;max-width:95vw;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <span style="font-weight:700;font-size:16px;color:var(--verde4)">📧 Enviar carta por correo</span>
-      <button onclick="cerrarModalCorreo()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
-    </div>
-    <div style="margin-bottom:14px">
-      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Destinatario (correo electrónico)</label>
-      <input id="correo-destinatario" type="email" placeholder="ejemplo@correo.com"
-        style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
-    </div>
-    <div style="margin-bottom:20px">
-      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Asunto</label>
-      <input id="correo-asunto" type="text"
-        style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
-    </div>
-    <div id="correo-estado" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button onclick="cerrarModalCorreo()" class="btn btn-outline">Cancelar</button>
-      <button onclick="enviarCartaCorreo()" id="btn-enviar-correo"
-        style="background:#E65100;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">
-        📤 Enviar
-      </button>
-    </div>
-  </div>
+</div>
 </div>
 </body></html>`);
   v.document.close();
@@ -5575,5 +5550,34 @@ function cerrarModalEnviarCorreo() {
 }
 
 </script>
+
+<!-- MODAL ENVÍO CORREO CARTA -->
+<div id="modal-envio-correo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;width:480px;max-width:95vw;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <span style="font-weight:700;font-size:16px;color:var(--verde4)">📧 Enviar carta por correo</span>
+      <button onclick="cerrarModalCorreo()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Destinatario (correo electrónico)</label>
+      <input id="correo-destinatario" type="email" placeholder="ejemplo@correo.com"
+        style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Asunto</label>
+      <input id="correo-asunto" type="text"
+        style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+    </div>
+    <div id="correo-estado" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="cerrarModalCorreo()" class="btn btn-outline">Cancelar</button>
+      <button onclick="enviarCartaCorreo()" id="btn-enviar-correo"
+        style="background:#E65100;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">
+        📤 Enviar
+      </button>
+    </div>
+  
+</div>
+</div>
 </body>
 </html>
