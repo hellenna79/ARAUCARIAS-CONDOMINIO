@@ -204,6 +204,22 @@ auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
+    // Verificar recordatorios pendientes
+    setTimeout(() => {
+      const hoy = new Date().toISOString().split('T')[0];
+      db.collection('incidencias').where('estado','!=','Resuelta').get().then(snap => {
+        const pendientes = [];
+        snap.forEach(d => {
+          const i = d.data();
+          if (i.recordatorio && i.recordatorio <= hoy) {
+            pendientes.push('• ' + i.tipo + (i.unidad?' (Unidad '+i.unidad+')':'') + ' — ' + i.recordatorio);
+          }
+        });
+        if (pendientes.length > 0) {
+          alert('🔔 Recordatorios de incidencias pendientes:\n\n' + pendientes.join('\n'));
+        }
+      }).catch(()=>{});
+    }, 2000);
     const nombre = user.displayName || user.email;
     document.getElementById('user-name').textContent = nombre;
     document.getElementById('user-initial').textContent = nombre[0].toUpperCase();
@@ -2791,6 +2807,8 @@ function mostrarIncidencias() {
           <select id="i-estado" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
             <option value="Abierta">Abierta</option><option value="En proceso">En proceso</option><option value="Resuelta">Resuelta</option>
           </select>
+          <label style="font-size:12px;color:#666">📅 Recordatorio (opcional)</label>
+          <input id="i-recordatorio" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="cerrarModalIncidencia()">Cancelar</button>
@@ -2800,20 +2818,84 @@ function mostrarIncidencias() {
     </div>`;
   db.collection('incidencias').orderBy('fecha','desc').get().then(snap => {
     if (snap.empty) { document.getElementById('lista-incidencias').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin incidencias registradas</div>'; return; }
-    let html='<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Tipo</th><th>Descripción</th><th>Estado</th></tr></thead><tbody>';
+    const hoy = new Date().toISOString().split('T')[0];
+    let html='<table><thead><tr><th>Fecha</th><th>Unidad</th><th>Tipo</th><th>Descripción</th><th>Estado</th><th>Recordatorio</th><th>Acciones</th></tr></thead><tbody>';
     snap.forEach(d=>{
       const i=d.data();
       const b=i.estado==='Resuelta'?'verde':i.estado==='En proceso'?'amarillo':'rojo';
-      html+=`<tr><td>${i.fecha||'—'}</td><td>${i.unidad||'—'}</td><td>${i.tipo||'—'}</td><td>${i.descripcion||'—'}</td><td><span class="badge badge-${b}">${i.estado||'—'}</span></td></tr>`;
+      const recVencido = i.recordatorio && i.recordatorio < hoy && i.estado !== 'Resuelta';
+      const recHoy = i.recordatorio && i.recordatorio === hoy;
+      const recColor = recVencido ? '#dc2626' : recHoy ? '#f97316' : '#555';
+      html+=`<tr style="background:${recVencido?'#fff5f5':recHoy?'#fffbeb':''}">
+        <td>${i.fecha||'—'}</td>
+        <td>${i.unidad||'—'}</td>
+        <td>${i.tipo||'—'}</td>
+        <td style="max-width:200px;font-size:12px">${i.descripcion||'—'}</td>
+        <td><span class="badge badge-${b}">${i.estado||'—'}</span></td>
+        <td style="color:${recColor};font-size:12px">${i.recordatorio ? (recVencido?'⚠️ ':recHoy?'🔔 ':'📅 ')+i.recordatorio : '—'}</td>
+        <td style="white-space:nowrap">
+          <button onclick="editarIncidencia('${d.id}')" style="background:#1a5276;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-right:3px">✏️</button>
+          <button onclick="eliminarIncidencia('${d.id}')" style="background:#c0392b;color:white;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px">🗑️</button>
+        </td>
+      </tr>`;
     });
     html+='</tbody></table>';
     document.getElementById('lista-incidencias').innerHTML=html;
   }).catch(()=>{document.getElementById('lista-incidencias').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin incidencias aún</div>';});
 }
-function abrirModalIncidencia(){document.getElementById('modal-incidencia').style.display='flex';document.getElementById('i-fecha').value=new Date().toISOString().split('T')[0];}
+
+function eliminarIncidencia(id) {
+  if (!confirm('¿Eliminar esta incidencia?')) return;
+  db.collection('incidencias').doc(id).delete()
+    .then(() => mostrarIncidencias())
+    .catch(e => alert('Error: ' + e.message));
+}
+
+function editarIncidencia(id) {
+  db.collection('incidencias').doc(id).get().then(doc => {
+    if (!doc.exists) return;
+    const i = doc.data();
+    document.getElementById('i-fecha').value = i.fecha||'';
+    document.getElementById('i-unidad').value = i.unidad||'';
+    document.getElementById('i-tipo').value = i.tipo||'';
+    document.getElementById('i-descripcion').value = i.descripcion||'';
+    document.getElementById('i-estado').value = i.estado||'Abierta';
+    document.getElementById('i-recordatorio').value = i.recordatorio||'';
+    // Cambiar el botón guardar para actualizar
+    const btn = document.querySelector('#modal-incidencia .btn-verde');
+    btn.textContent = '💾 Actualizar';
+    btn.onclick = function() { actualizarIncidencia(id); };
+    document.getElementById('modal-incidencia').style.display = 'flex';
+  });
+}
+
+function actualizarIncidencia(id) {
+  const datos = {
+    fecha: document.getElementById('i-fecha').value,
+    unidad: document.getElementById('i-unidad').value,
+    tipo: document.getElementById('i-tipo').value,
+    descripcion: document.getElementById('i-descripcion').value,
+    estado: document.getElementById('i-estado').value,
+    recordatorio: document.getElementById('i-recordatorio').value||''
+  };
+  db.collection('incidencias').doc(id).update(datos)
+    .then(() => { cerrarModalIncidencia(); mostrarIncidencias(); })
+    .catch(e => alert('Error: ' + e.message));
+}
+
+function abrirModalIncidencia(){
+  document.getElementById('modal-incidencia').style.display='flex';
+  document.getElementById('i-fecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('i-unidad').value='';
+  document.getElementById('i-descripcion').value='';
+  document.getElementById('i-recordatorio').value='';
+  const btn = document.querySelector('#modal-incidencia .btn-verde');
+  btn.textContent = 'Guardar';
+  btn.onclick = guardarIncidencia;
+}
 function cerrarModalIncidencia(){document.getElementById('modal-incidencia').style.display='none';}
 function guardarIncidencia(){
-  const datos={fecha:document.getElementById('i-fecha').value,unidad:document.getElementById('i-unidad').value,tipo:document.getElementById('i-tipo').value,descripcion:document.getElementById('i-descripcion').value,estado:document.getElementById('i-estado').value};
+  const datos={fecha:document.getElementById('i-fecha').value,unidad:document.getElementById('i-unidad').value,tipo:document.getElementById('i-tipo').value,descripcion:document.getElementById('i-descripcion').value,estado:document.getElementById('i-estado').value,recordatorio:document.getElementById('i-recordatorio').value||''};
   if(!datos.descripcion){alert('Ingresa la descripción');return;}
   db.collection('incidencias').add(datos).then(()=>{cerrarModalIncidencia();mostrarIncidencias();}).catch(e=>alert('Error: '+e.message));
 }
