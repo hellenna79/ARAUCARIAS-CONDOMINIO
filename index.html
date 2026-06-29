@@ -204,6 +204,12 @@ auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
+    // Solicitar permiso de notificaciones
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    // Iniciar monitor de recordatorios
+    iniciarMonitorRecordatorios();
     // Verificar recordatorios pendientes
     setTimeout(() => {
       const hoy = new Date().toISOString().split('T')[0];
@@ -2807,8 +2813,11 @@ function mostrarIncidencias() {
           <select id="i-estado" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
             <option value="Abierta">Abierta</option><option value="En proceso">En proceso</option><option value="Resuelta">Resuelta</option>
           </select>
-          <label style="font-size:12px;color:#666">📅 Recordatorio (opcional)</label>
-          <input id="i-recordatorio" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <label style="font-size:12px;color:#666">🔔 Recordatorio (opcional)</label>
+          <div style="display:flex;gap:8px">
+            <input id="i-recordatorio" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;flex:1">
+            <input id="i-recordatorio-hora" type="time" value="09:00" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;width:110px">
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
           <button class="btn btn-outline" onclick="cerrarModalIncidencia()">Cancelar</button>
@@ -2842,6 +2851,36 @@ function mostrarIncidencias() {
     html+='</tbody></table>';
     document.getElementById('lista-incidencias').innerHTML=html;
   }).catch(()=>{document.getElementById('lista-incidencias').innerHTML='<div style="padding:24px;text-align:center;color:#999">Sin incidencias aún</div>';});
+}
+
+
+// ===== MONITOR DE RECORDATORIOS CON NOTIFICACIÓN PUSH =====
+function iniciarMonitorRecordatorios() {
+  // Revisar cada minuto si hay recordatorios que notificar
+  setInterval(() => {
+    const ahora = new Date();
+    const fechaHoy = ahora.toISOString().split('T')[0];
+    const horaAhora = ahora.getHours().toString().padStart(2,'0') + ':' + ahora.getMinutes().toString().padStart(2,'0');
+    
+    db.collection('incidencias').where('estado','!=','Resuelta').get().then(snap => {
+      snap.forEach(d => {
+        const i = d.data();
+        if (!i.recordatorio || !i.recordatorioHora) return;
+        if (i.recordatorio === fechaHoy && i.recordatorioHora === horaAhora) {
+          // Mostrar notificación push
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('🔔 Recordatorio — Condominio Las Araucarias', {
+              body: i.tipo + (i.unidad ? ' — Unidad ' + i.unidad : '') + '\n' + (i.descripcion||''),
+              icon: 'https://hellenna79.github.io/ARAUCARIAS-CONDOMINIO/favicon.ico'
+            });
+          } else {
+            // Si no hay permiso, mostrar alert
+            alert('🔔 Recordatorio: ' + i.tipo + (i.unidad ? ' — Unidad ' + i.unidad : '') + '\n' + (i.descripcion||''));
+          }
+        }
+      });
+    }).catch(()=>{});
+  }, 60000); // Revisar cada 60 segundos
 }
 
 function eliminarIncidencia(id) {
@@ -2895,7 +2934,7 @@ function abrirModalIncidencia(){
 }
 function cerrarModalIncidencia(){document.getElementById('modal-incidencia').style.display='none';}
 function guardarIncidencia(){
-  const datos={fecha:document.getElementById('i-fecha').value,unidad:document.getElementById('i-unidad').value,tipo:document.getElementById('i-tipo').value,descripcion:document.getElementById('i-descripcion').value,estado:document.getElementById('i-estado').value,recordatorio:document.getElementById('i-recordatorio').value||''};
+  const datos={fecha:document.getElementById('i-fecha').value,unidad:document.getElementById('i-unidad').value,tipo:document.getElementById('i-tipo').value,descripcion:document.getElementById('i-descripcion').value,estado:document.getElementById('i-estado').value,recordatorio:document.getElementById('i-recordatorio').value||'',recordatorioHora:document.getElementById('i-recordatorio-hora').value||'09:00'};
   if(!datos.descripcion){alert('Ingresa la descripción');return;}
   db.collection('incidencias').add(datos).then(()=>{cerrarModalIncidencia();mostrarIncidencias();}).catch(e=>alert('Error: '+e.message));
 }
