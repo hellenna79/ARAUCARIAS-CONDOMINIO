@@ -2809,10 +2809,26 @@ function mostrarIncidencias() {
         <div style="display:flex;flex-direction:column;gap:12px">
           <input id="i-fecha" type="date" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
           <input id="i-unidad" placeholder="Unidad que reporta (opcional)" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-          <select id="i-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-            <option>Ruidos molestos</option><option>Daños en área común</option><option>Problemas de convivencia</option>
-            <option>Filtraciones / humedad</option><option>Falla eléctrica</option><option>Seguridad</option><option>Otro</option>
-          </select>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="i-tipo" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;flex:1">
+              <option>Ruidos molestos</option>
+              <option>Estacionamiento indebido</option>
+              <option>Habilitar acceso — Portón</option>
+              <option>Habilitar acceso — Citófono</option>
+              <option>Daños en área común</option>
+              <option>Problemas de convivencia</option>
+              <option>Filtraciones / humedad</option>
+              <option>Falla eléctrica</option>
+              <option>Revisión cartola bancaria</option>
+              <option>Solicitud certificado</option>
+              <option>Revisión cámaras</option>
+              <option>Revisión falla técnica</option>
+              <option>Enviar carta de aviso</option>
+              <option>Seguridad</option>
+              <option>Otro</option>
+            </select>
+            <button type="button" onclick="abrirGestionarTipos()" style="background:#e8f5ee;border:1px solid var(--borde);border-radius:8px;padding:10px;cursor:pointer;font-size:13px" title="Gestionar tipos">⚙️</button>
+          </div>
           <textarea id="i-descripcion" rows="3" placeholder="Descripción de la incidencia" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical"></textarea>
           <select id="i-estado" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
             <option value="Abierta">Abierta</option><option value="En proceso">En proceso</option><option value="Resuelta">Resuelta</option>
@@ -2858,6 +2874,75 @@ function mostrarIncidencias() {
 }
 
 
+
+
+// ===== GESTIONAR TIPOS DE INCIDENCIA =====
+function abrirGestionarTipos() {
+  const select = document.getElementById('i-tipo');
+  const tipos = [...select.options].map(o => o.value);
+  
+  const modal = document.createElement('div');
+  modal.id = 'modal-tipos';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center';
+  
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:24px;width:400px;max-width:94vw;max-height:80vh;overflow-y:auto">
+      <h3 style="margin-bottom:16px;color:var(--verde4)">⚙️ Gestionar tipos de incidencia</h3>
+      <div id="lista-tipos" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+        ${tipos.map((t,i) => `
+          <div style="display:flex;gap:6px;align-items:center">
+            <input value="${t}" style="flex:1;padding:8px;border:1px solid var(--borde);border-radius:6px;font-size:13px" onchange="this.dataset.changed='1'">
+            <button onclick="this.parentElement.remove()" style="background:#fee2e2;color:#dc2626;border:none;padding:6px 10px;border-radius:6px;cursor:pointer">✖</button>
+          </div>`).join('')}
+      </div>
+      <button onclick="agregarTipoIncidencia()" style="background:#e8f5ee;border:1px solid var(--borde);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;margin-bottom:12px">+ Agregar tipo</button>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-tipos').remove()" class="btn btn-outline">Cancelar</button>
+        <button onclick="guardarTiposIncidencia()" class="btn btn-verde">💾 Guardar</button>
+      </div>
+    </div>`;
+  
+  document.body.appendChild(modal);
+}
+
+function agregarTipoIncidencia() {
+  const lista = document.getElementById('lista-tipos');
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:6px;align-items:center';
+  div.innerHTML = `
+    <input placeholder="Nuevo tipo..." style="flex:1;padding:8px;border:1px solid var(--borde);border-radius:6px;font-size:13px">
+    <button onclick="this.parentElement.remove()" style="background:#fee2e2;color:#dc2626;border:none;padding:6px 10px;border-radius:6px;cursor:pointer">✖</button>`;
+  lista.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function guardarTiposIncidencia() {
+  const inputs = document.querySelectorAll('#lista-tipos input');
+  const select = document.getElementById('i-tipo');
+  const valorActual = select.value;
+  
+  // Limpiar y recargar opciones
+  select.innerHTML = '';
+  inputs.forEach(inp => {
+    const val = inp.value.trim();
+    if (val) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val;
+      select.appendChild(opt);
+    }
+  });
+  
+  // Restaurar selección si existe
+  if (select.querySelector(`option[value="${valorActual}"]`)) select.value = valorActual;
+  
+  // Guardar en Firestore para persistir
+  const tipos = [...select.options].map(o => o.value);
+  db.collection('config').doc('tipos_incidencia').set({tipos, actualizado: new Date().toISOString()}).catch(()=>{});
+  
+  document.getElementById('modal-tipos').remove();
+  alert('✅ Tipos actualizados');
+}
 
 // ===== GOOGLE CALENDAR INTEGRATION =====
 const GCAL_CLIENT_ID = '593035869625-ue7uhn8mblemqolnhe0708m814bcgoct.apps.googleusercontent.com';
@@ -3002,6 +3087,15 @@ function abrirModalIncidencia(){
   const btn = document.querySelector('#modal-incidencia .btn-verde');
   btn.textContent = 'Guardar';
   btn.onclick = guardarIncidencia;
+  // Cargar tipos personalizados si existen
+  db.collection('config').doc('tipos_incidencia').get().then(doc => {
+    if (doc.exists && doc.data().tipos) {
+      const select = document.getElementById('i-tipo');
+      const actual = select.value;
+      select.innerHTML = doc.data().tipos.map(t => `<option>${t}</option>`).join('');
+      if (actual) select.value = actual;
+    }
+  }).catch(()=>{});
 }
 function cerrarModalIncidencia(){document.getElementById('modal-incidencia').style.display='none';}
 function guardarIncidencia(){
