@@ -2146,7 +2146,17 @@ function enviarCartaCorreo() {
     return;
   }
 
-  const cartaHtml = document.getElementById('contenido-carta').innerHTML;
+  // Extraer HTML limpio sin logo base64 (para no superar límite de EmailJS)
+  const contenedorOriginal = document.getElementById('contenido-carta');
+  const clon = contenedorOriginal.cloneNode(true);
+  // Eliminar imágenes con base64 (logo)
+  clon.querySelectorAll('img').forEach(img => {
+    if (img.src && img.src.startsWith('data:')) {
+      img.remove();
+    }
+  });
+  // HTML limpio y liviano
+  const cartaHtml = '<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;max-width:700px;margin:0 auto">' + clon.innerHTML + '</div>';
 
   btn.disabled = true;
   btn.textContent = '⏳ Enviando...';
