@@ -2204,6 +2204,9 @@ function enviarCartaCorreo() {
       estado: 'enviado'
     }).catch(()=>{});
 
+    // Cerrar modal automáticamente después de 2 segundos
+    setTimeout(() => { cerrarModalCorreo(); }, 2000);
+
   }).catch(err => {
     estado.style.display = 'block';
     estado.style.background = '#ffebee';
