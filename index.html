@@ -2056,51 +2056,50 @@ function buscarResidentePorUnidad() {
   info.style.display = 'block';
   info.innerHTML = '⏳ Buscando...';
 
-  // 1. Buscar residente
+  // 1. Buscar en el array GASTOS_JUNIO_2026 (datos reales del condominio)
+  const gc = (typeof GASTOS_JUNIO_2026 !== 'undefined')
+    ? GASTOS_JUNIO_2026.find(g => String(g.unidad) === String(unidad))
+    : null;
+
+  if (gc) {
+    const nombre = gc.residente || '';
+    const capitalAtrasado = Number(gc.capitalAtrasado) || 0;
+    const totalMes = Number(gc.totalMes) || 0;
+    const intereses = Number(gc.intereses) || 0;
+    const abonos = Number(gc.abonos) || 0;
+    const saldoPendiente = Math.max(0, capitalAtrasado + totalMes - abonos);
+    const totalConIntereses = saldoPendiente + intereses;
+
+    document.getElementById('c-nombre').value = nombre;
+    document.getElementById('c-deuda-base').value = saldoPendiente;
+    document.getElementById('c-intereses').value = intereses;
+
+    let deudaTexto = saldoPendiente > 0
+      ? `Capital atrasado: <strong>$${saldoPendiente.toLocaleString('es-CL')}</strong>`
+      : 'Sin deuda pendiente';
+    let interesTexto = intereses > 0 ? ` + Intereses: $${intereses.toLocaleString('es-CL')}` : '';
+    let totalTexto = totalConIntereses > 0
+      ? ` = Total: <strong style="color:#c62828">$${totalConIntereses.toLocaleString('es-CL')}</strong>`
+      : '';
+
+    info.innerHTML = `✅ <strong>${nombre}</strong> — ${deudaTexto}${interesTexto}${totalTexto}`;
+    return;
+  }
+
+  // 2. Si no está en el array, buscar en Firestore residentes
   db.collection('residentes').where('unidad','==',unidad).get().then(snapRes => {
-    let nombre = '';
-    let intereses = 0;
     if (!snapRes.empty) {
       const r = snapRes.docs[0].data();
-      nombre = r.nombre || '';
-      intereses = r.intereses || 0;
+      const nombre = r.nombre || '';
+      const deuda = r.deuda || 0;
+      const intereses = r.intereses || 0;
       document.getElementById('c-nombre').value = nombre;
+      document.getElementById('c-deuda-base').value = deuda;
       document.getElementById('c-intereses').value = intereses;
+      info.innerHTML = `✅ <strong>${nombre}</strong> — Deuda: $${deuda.toLocaleString('es-CL')} + Intereses: $${intereses.toLocaleString('es-CL')}`;
     } else {
-      info.innerHTML = '⚠️ Unidad no encontrada en el registro de residentes';
-      return;
+      info.innerHTML = '⚠️ Unidad no encontrada';
     }
-
-    // 2. Buscar gastos comunes pendientes de esa unidad
-    db.collection('gastos_comunes').where('unidad','==',unidad).get().then(snapGC => {
-      let totalPendiente = 0;
-      let mesesPendientes = [];
-      snapGC.forEach(doc => {
-        const g = doc.data();
-        if (!g.pagado) {
-          totalPendiente += Number(g.monto) || 0;
-          if (g.mes) mesesPendientes.push(g.mes);
-        }
-      });
-
-      document.getElementById('c-deuda-base').value = totalPendiente;
-
-      // Mostrar resumen en el panel de info
-      const totalConIntereses = totalPendiente + intereses;
-      let detalleMeses = mesesPendientes.length > 0
-        ? `<br><span style="font-size:11px;color:#555">Meses pendientes: ${mesesPendientes.join(', ')}</span>`
-        : '';
-      let deudaTexto = totalPendiente > 0
-        ? `Deuda GC: <strong>$${totalPendiente.toLocaleString('es-CL')}</strong>`
-        : 'Sin deuda pendiente en GC';
-
-      info.innerHTML = `✅ <strong>${nombre}</strong> — ${deudaTexto} + Intereses: $${intereses.toLocaleString('es-CL')} = Total: <strong style="color:#c62828">$${totalConIntereses.toLocaleString('es-CL')}</strong>${detalleMeses}`;
-
-    }).catch(() => {
-      document.getElementById('c-deuda-base').value = 0;
-      info.innerHTML = `✅ <strong>${nombre}</strong> — Sin datos de gastos comunes`;
-    });
-
   }).catch(() => {
     info.innerHTML = '❌ Error al buscar la unidad';
   });
