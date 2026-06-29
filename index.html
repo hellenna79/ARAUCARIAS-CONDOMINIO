@@ -6,6 +6,8 @@
 <title>Condominio Las Araucarias</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -208,6 +210,8 @@ auth.onAuthStateChanged(user => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
+    // Inicializar Google Calendar
+    setTimeout(() => { if (typeof google !== 'undefined') inicializarGoogleCalendar(); }, 1500);
     // Iniciar monitor de recordatorios
     iniciarMonitorRecordatorios();
     // Verificar recordatorios pendientes
@@ -2854,6 +2858,64 @@ function mostrarIncidencias() {
 }
 
 
+
+// ===== GOOGLE CALENDAR INTEGRATION =====
+const GCAL_CLIENT_ID = '593035869625-ue7uhn8mblemqolnhe0708m814bcgoct.apps.googleusercontent.com';
+const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+let gcalTokenClient = null;
+let gcalAccessToken = null;
+
+function inicializarGoogleCalendar() {
+  if (typeof google === 'undefined') return;
+  gcalTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_CLIENT_ID,
+    scope: GCAL_SCOPES,
+    callback: (resp) => {
+      if (resp.error) return;
+      gcalAccessToken = resp.access_token;
+    }
+  });
+}
+
+function crearEventoCalendar(titulo, fecha, hora, descripcion, callback) {
+  const fechaHora = fecha + 'T' + hora + ':00';
+  const fechaHoraFin = fecha + 'T' + (String(parseInt(hora.split(':')[0])+1).padStart(2,'0')) + ':' + hora.split(':')[1] + ':00';
+  
+  const evento = {
+    summary: '🔔 ' + titulo,
+    description: descripcion || '',
+    start: { dateTime: fechaHora, timeZone: 'America/Santiago' },
+    end: { dateTime: fechaHoraFin, timeZone: 'America/Santiago' },
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 10 }] }
+  };
+
+  const crearEvento = () => {
+    fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + gcalAccessToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(evento)
+    }).then(r => r.json()).then(data => {
+      if (data.id) {
+        if (callback) callback(true);
+        alert('✅ Recordatorio agregado a Google Calendar');
+      } else {
+        if (callback) callback(false);
+        alert('Error al crear evento: ' + JSON.stringify(data.error));
+      }
+    }).catch(e => { if (callback) callback(false); });
+  };
+
+  if (gcalAccessToken) {
+    crearEvento();
+  } else {
+    gcalTokenClient.requestAccessToken();
+    setTimeout(crearEvento, 2000);
+  }
+}
+
 // ===== MONITOR DE RECORDATORIOS CON NOTIFICACIÓN PUSH =====
 function iniciarMonitorRecordatorios() {
   // Revisar cada minuto si hay recordatorios que notificar
@@ -2936,7 +2998,16 @@ function cerrarModalIncidencia(){document.getElementById('modal-incidencia').sty
 function guardarIncidencia(){
   const datos={fecha:document.getElementById('i-fecha').value,unidad:document.getElementById('i-unidad').value,tipo:document.getElementById('i-tipo').value,descripcion:document.getElementById('i-descripcion').value,estado:document.getElementById('i-estado').value,recordatorio:document.getElementById('i-recordatorio').value||'',recordatorioHora:document.getElementById('i-recordatorio-hora').value||'09:00'};
   if(!datos.descripcion){alert('Ingresa la descripción');return;}
-  db.collection('incidencias').add(datos).then(()=>{cerrarModalIncidencia();mostrarIncidencias();}).catch(e=>alert('Error: '+e.message));
+  db.collection('incidencias').add(datos).then(()=>{
+    cerrarModalIncidencia();
+    mostrarIncidencias();
+    if (datos.recordatorio && datos.recordatorioHora) {
+      if (confirm('Recordatorio guardado. ¿Agregar al Google Calendar?')) {
+        const titulo = 'Incidencia: ' + datos.tipo + (datos.unidad ? ' - Unidad ' + datos.unidad : '');
+        crearEventoCalendar(titulo, datos.recordatorio, datos.recordatorioHora, datos.descripcion);
+      }
+    }
+  }).catch(e=>alert('Error: '+e.message));
 }
 
 // ===================== MANTENCIONES =====================
