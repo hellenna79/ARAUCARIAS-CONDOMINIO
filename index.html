@@ -2205,7 +2205,7 @@ function enviarCartaCorreo() {
     }).catch(()=>{});
 
     // Cerrar modal automáticamente después de 2 segundos
-    setTimeout(() => { cerrarModalCorreo(); }, 2000);
+    setTimeout(() => { document.getElementById('modal-envio-correo').style.display='none'; }, 2000);
 
   }).catch(err => {
     estado.style.display = 'block';
