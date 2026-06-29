@@ -3001,6 +3001,7 @@ function guardarIncidencia(){
   db.collection('incidencias').add(datos).then(()=>{
     cerrarModalIncidencia();
     mostrarIncidencias();
+    alert('Recordatorio: [' + datos.recordatorio + '] Hora: [' + datos.recordatorioHora + ']');
     if (datos.recordatorio && datos.recordatorioHora) {
       if (confirm('Recordatorio guardado. ¿Agregar al Google Calendar?')) {
         const titulo = 'Incidencia: ' + datos.tipo + (datos.unidad ? ' - Unidad ' + datos.unidad : '');
