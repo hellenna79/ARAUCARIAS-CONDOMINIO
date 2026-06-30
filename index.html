@@ -1974,6 +1974,7 @@ function mostrarCartas() {
       <div class="card" style="cursor:pointer;border:2px solid #8e44ad" onclick="abrirCartaAviso()"><div class="card-icon">📋</div><div class="card-valor" style="font-size:13px;color:#8e44ad">Carta de Aviso</div><div class="card-label">Ruido, estacionamiento, tenencia, reglamento. Texto editable.</div></div>
       <div class="card" style="cursor:pointer;border:2px solid #c0392b" onclick="abrirNotificacionMulta()"><div class="card-icon">🚨</div><div class="card-valor" style="font-size:13px;color:#c0392b">Notificación de Multa</div><div class="card-label">Notifica multa con monto y motivo editable.</div></div>
       <div class="card" style="cursor:pointer;border:2px solid #2c3e50" onclick="abrirCitacionAsamblea()"><div class="card-icon">📅</div><div class="card-valor" style="font-size:13px;color:#2c3e50">Citación Asamblea</div><div class="card-label">Genera citación oficial con firma y timbre.</div></div>
+      <div class="card" style="cursor:pointer;border:2px solid #1565C0" onclick="abrirInformativo()"><div class="card-icon">📢</div><div class="card-valor" style="font-size:13px;color:#1565C0">Informativo</div><div class="card-label">Comunicado correlativo para residentes. Individual o masivo.</div></div>
     </div>
 
     <div id="modal-carta" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px">
@@ -2429,6 +2430,219 @@ function enviarMasivoCitacion() {
   enviarSiguiente(0);
 }
 // ── FIN ENVÍO MASIVO ────────────────────────────────────────────────────
+
+
+// ── MÓDULO INFORMATIVOS ──────────────────────────────────────────────────
+let _htmlInformativo = '';
+let _numeroInformativoActual = 0;
+
+function abrirInformativo() {
+  let m = document.getElementById('modal-informativo');
+  m.style.display = 'flex';
+  document.getElementById('inf-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inf-cuerpo-editor').innerHTML = '';
+  document.getElementById('inf-cuerpo').value = '';
+  document.getElementById('inf-nombre-nueva').value = '';
+  _htmlInformativo = '';
+
+  // Obtener próximo número correlativo
+  db.collection('informativos_contador').doc('contador').get().then(doc => {
+    const actual = doc.exists ? (doc.data().ultimo || 0) : 0;
+    _numeroInformativoActual = actual + 1;
+    document.getElementById('inf-numero-display').textContent = _numeroInformativoActual;
+  }).catch(()=>{
+    _numeroInformativoActual = 1;
+    document.getElementById('inf-numero-display').textContent = 1;
+  });
+
+  cargarSelectorTemasInformativo();
+}
+
+function cargarSelectorTemasInformativo(){
+  const sel = document.getElementById('inf-tipo');
+  if(!sel) return;
+  db.collection('plantillas_informativo').orderBy('nombre').get().then(snap=>{
+    sel.innerHTML = '<option value="">-- Selecciona un tema --</option>';
+    snap.forEach(d=>{
+      const p = d.data();
+      sel.innerHTML += `<option value="${d.id}">${p.nombre||'Sin nombre'}</option>`;
+    });
+  }).catch(()=>{});
+}
+
+function aplicarTextoInformativo(id){
+  const editor = document.getElementById('inf-cuerpo-editor');
+  const ta = document.getElementById('inf-cuerpo');
+  const nombreInput = document.getElementById('inf-nombre-nueva');
+  if(!id){ if(editor) editor.innerHTML=''; if(ta) ta.value=''; if(nombreInput) nombreInput.value=''; return; }
+  db.collection('plantillas_informativo').doc(id).get().then(doc=>{
+    if(doc.exists){
+      const p = doc.data();
+      const cuerpo = p.cuerpo||'';
+      if(editor) editor.innerHTML = cuerpo;
+      if(ta) ta.value = cuerpo;
+      if(nombreInput) nombreInput.value = p.nombre||'';
+      ta.dataset.plantillaId = doc.id;
+    }
+  });
+}
+
+function guardarMotivoInformativo(){
+  const editor = document.getElementById('inf-cuerpo-editor');
+  const cuerpo = editor?.innerHTML?.trim();
+  const nombre = document.getElementById('inf-nombre-nueva')?.value?.trim();
+  if(!nombre){ alert('Escribe un nombre para este tema (ej: Corte de agua programado)'); return; }
+  if(!cuerpo){ alert('Escribe el texto del informativo primero'); return; }
+
+  const ta = document.getElementById('inf-cuerpo');
+  const idExistente = ta?.dataset?.plantillaId;
+  const datos = { nombre: nombre, cuerpo: cuerpo, actualizado: new Date().toISOString() };
+
+  const promesa = idExistente
+    ? db.collection('plantillas_informativo').doc(idExistente).set(datos)
+    : db.collection('plantillas_informativo').add(datos);
+
+  promesa.then((ref)=>{
+    if(ref && ref.id && ta) ta.dataset.plantillaId = ref.id;
+    cargarSelectorTemasInformativo();
+    alert('✅ Guardado: "' + nombre + '"');
+  }).catch(err=>{
+    alert('❌ Error al guardar: ' + err.message);
+  });
+}
+
+function generarInformativo2(soloGenerar) {
+  const editor = document.getElementById('inf-cuerpo-editor');
+  const cuerpo = editor?.innerHTML || '';
+  const fechaRaw = document.getElementById('inf-fecha')?.value || new Date().toISOString().split('T')[0];
+  const [y,m,d] = fechaRaw.split('-');
+  const mesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(m)-1];
+  const numero = _numeroInformativoActual || 1;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informativo</title>
+  <style>body{font-family:Arial,sans-serif;font-size:13px;padding:60px;max-width:720px;margin:0 auto;line-height:1.9;color:#222}
+  h2{color:#1565C0;text-align:center;margin-bottom:4px}
+  .sub{text-align:center;color:#555;font-size:12px;margin-bottom:24px}
+  .titulo{text-align:center;font-weight:700;font-size:15px;color:#1565C0;text-transform:uppercase;margin:18px 0;border-top:3px solid #1565C0;border-bottom:3px solid #1565C0;padding:10px 0}
+  </style></head><body>
+  <h2>CONDOMINIO LAS ARAUCARIAS</h2>
+  <div class="sub">La Cruz, Quillota · adm.lasaraucarias2020@gmail.com<br>La Cruz, ${d} de ${mesNombre} de ${y}</div>
+  <div class="titulo">INFORMATIVO N° ${numero}</div>
+  <div>${cuerpo}</div>
+  </body></html>`;
+
+  _htmlInformativo = html;
+
+  if (!soloGenerar) {
+    const v = window.open('','_blank');
+    v.document.write(html);
+    v.document.close();
+    setTimeout(()=>v.print(),600);
+    // Guardar correlativo solo cuando efectivamente se genera/usa
+    guardarCorrelativoInformativo(numero);
+  }
+}
+
+function guardarCorrelativoInformativo(numero) {
+  db.collection('informativos_contador').doc('contador').set({ultimo: numero}).catch(()=>{});
+  db.collection('registro_informativos').add({
+    numero: numero, fecha: new Date().toISOString()
+  }).catch(()=>{});
+}
+
+function prepararCorreoInformativo() {
+  if (!_htmlInformativo) {
+    generarInformativo2(true);
+  }
+  if (!_htmlInformativo) { alert('Completa el informativo primero.'); return; }
+  guardarCorrelativoInformativo(_numeroInformativoActual);
+  abrirCorreoAviso('Informativo N° ' + _numeroInformativoActual, _htmlInformativo, '', 'Informativo N° ' + _numeroInformativoActual + ' - Condominio Las Araucarias');
+}
+
+// Envío masivo de informativo
+function abrirEnvioMasivoInformativo() {
+  if (!_htmlInformativo) {
+    generarInformativo2(true);
+  }
+  if (!_htmlInformativo) { alert('Completa el informativo primero.'); return; }
+
+  document.getElementById('modal-masivo-inf-titulo').textContent = '📨 Envío masivo - Informativo N° ' + _numeroInformativoActual;
+  document.getElementById('masivo-inf-estado').style.display = 'none';
+  document.getElementById('modal-envio-masivo-inf').style.display = 'flex';
+  const lista = document.getElementById('lista-residentes-masivo-inf');
+  lista.innerHTML = '<div style="padding:20px;text-align:center;color:#999">Cargando residentes...</div>';
+
+  db.collection('residentes').orderBy('unidad').get().then(snap => {
+    let html = '';
+    snap.forEach(d => {
+      const r = d.data();
+      const correo = r.correo || r.email || '';
+      if (!correo) return;
+      html += `<label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f0f0f0;cursor:pointer">
+        <input type="checkbox" class="chk-residente-masivo-inf" value="${correo}" checked>
+        <span style="font-size:13px"><strong>Unidad ${r.unidad||'?'}</strong> — ${r.nombre||'Sin nombre'} <span style="color:#888">(${correo})</span></span>
+      </label>`;
+    });
+    lista.innerHTML = html || '<div style="padding:20px;text-align:center;color:#999">Ningún residente tiene correo registrado.</div>';
+  }).catch(()=>{
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:#c62828">Error al cargar residentes.</div>';
+  });
+}
+
+function seleccionarTodosMasivoInf(valor) {
+  document.querySelectorAll('.chk-residente-masivo-inf').forEach(chk => { chk.checked = valor; });
+}
+
+function enviarMasivoInformativo() {
+  const checks = Array.from(document.querySelectorAll('.chk-residente-masivo-inf:checked'));
+  const estado = document.getElementById('masivo-inf-estado');
+  const btn = document.getElementById('btn-enviar-masivo-inf');
+
+  if (checks.length === 0) {
+    estado.style.display = 'block';
+    estado.style.background = '#fff3e0';
+    estado.style.color = '#e65100';
+    estado.textContent = '⚠️ Selecciona al menos un residente.';
+    return;
+  }
+
+  let htmlLimpio = _htmlInformativo;
+  const bodyMatch = htmlLimpio.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) htmlLimpio = bodyMatch[1];
+  const tmp = document.createElement('div');
+  tmp.innerHTML = htmlLimpio;
+  tmp.querySelectorAll('img').forEach(img => { if(img.src && img.src.startsWith('data:')) img.remove(); });
+  const cartaHtml = '<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.9;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a">' + tmp.innerHTML + '</div>';
+  const asunto = 'Informativo N° ' + _numeroInformativoActual + ' - Condominio Las Araucarias';
+
+  btn.disabled = true;
+  estado.style.display = 'block';
+  estado.style.background = '#e3f2fd';
+  estado.style.color = '#1565c0';
+
+  let enviados = 0, fallidos = 0;
+  const total = checks.length;
+  guardarCorrelativoInformativo(_numeroInformativoActual);
+
+  function enviarSiguiente(i) {
+    if (i >= total) {
+      estado.style.background = '#e8f5e9';
+      estado.style.color = '#2e7d32';
+      estado.textContent = `✅ Envío completo: ${enviados} enviados, ${fallidos} con error.`;
+      btn.disabled = false;
+      return;
+    }
+    const correo = checks[i].value;
+    estado.textContent = `⏳ Enviando ${i+1} de ${total}... (${correo})`;
+    emailjs.send('service_h8lfgpi', 'template_xodle1d', {
+      to_email: correo, subject: asunto, carta_html: cartaHtml
+    }).then(()=>{ enviados++; }).catch(()=>{ fallidos++; })
+      .finally(()=>{ setTimeout(()=>enviarSiguiente(i+1), 400); });
+  }
+
+  enviarSiguiente(0);
+}
+// ── FIN MÓDULO INFORMATIVOS ──────────────────────────────────────────────
 
 function cerrarVisor() { document.getElementById('visor-carta').style.display='none'; }
 
@@ -5994,6 +6208,76 @@ function cerrarModalEnviarCorreo() {
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button onclick="document.getElementById('modal-envio-masivo').style.display='none'" class="btn btn-outline">Cancelar</button>
       <button onclick="enviarMasivoCitacion()" id="btn-enviar-masivo"
+        style="background:#6a1b9a;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">
+        📤 Enviar a seleccionados
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INFORMATIVO -->
+<div id="modal-informativo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:16px;padding:28px;width:680px;max-width:96vw;max-height:90vh;overflow-y:auto">
+    <h3 style="margin-bottom:16px;color:#1565C0">📢 Informativo N° <span id="inf-numero-display">-</span></h3>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tema / Asunto</label>
+        <select id="inf-tipo" onchange="aplicarTextoInformativo(this.value)" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+          <option value="">-- Selecciona un tema --</option>
+        </select>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input id="inf-nombre-nueva" placeholder="Nombre para guardar este tema (ej: Corte de agua programado)" style="flex:1;padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:12px">
+          <button type="button" onclick="guardarMotivoInformativo()" style="background:#1565C0;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;white-space:nowrap">💾 Guardar</button>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Fecha</label>
+        <input id="inf-fecha" type="date" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Cuerpo del informativo (editable)</label>
+        <div style="border:1px solid var(--borde);border-radius:8px;overflow:hidden">
+          <div style="background:#f5f5f5;padding:6px 10px;border-bottom:1px solid var(--borde);display:flex;gap:4px">
+            <button type="button" onclick="formatoEditor('inf-cuerpo-editor','bold')" title="Negrita"
+              style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;font-size:13px">B</button>
+            <button type="button" onclick="formatoEditor('inf-cuerpo-editor','italic')" title="Cursiva"
+              style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-style:italic;font-size:13px">I</button>
+            <button type="button" onclick="formatoEditor('inf-cuerpo-editor','underline')" title="Subrayado"
+              style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;text-decoration:underline;font-size:13px">U</button>
+          </div>
+          <div id="inf-cuerpo-editor" contenteditable="true"
+            style="min-height:180px;padding:10px;font-size:13px;line-height:1.6;outline:none;white-space:pre-wrap"></div>
+          <textarea id="inf-cuerpo" style="display:none"></textarea>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-informativo').style.display='none'">Cancelar</button>
+      <button class="btn btn-verde" onclick="generarInformativo2(false)">👁️ Vista previa e imprimir</button>
+      <button class="btn" style="background:#E65100;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600" onclick="prepararCorreoInformativo()">📧 Enviar a uno</button>
+      <button class="btn" style="background:#6a1b9a;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600" onclick="abrirEnvioMasivoInformativo()">📨 Envío masivo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVÍO MASIVO INFORMATIVO -->
+<div id="modal-envio-masivo-inf" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:12px;width:520px;max-width:95vw;max-height:85vh;overflow-y:auto;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-weight:700;font-size:16px;color:#1565C0" id="modal-masivo-inf-titulo">📨 Envío masivo - Informativo</span>
+      <button onclick="document.getElementById('modal-envio-masivo-inf').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
+    </div>
+    <div style="margin-bottom:12px;display:flex;gap:10px">
+      <button onclick="seleccionarTodosMasivoInf(true)" style="background:#2980b9;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">Seleccionar todos</button>
+      <button onclick="seleccionarTodosMasivoInf(false)" style="background:#888;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">Quitar selección</button>
+    </div>
+    <div id="lista-residentes-masivo-inf" style="border:1px solid var(--borde);border-radius:8px;max-height:280px;overflow-y:auto;padding:8px">
+      <div style="padding:20px;text-align:center;color:#999">Cargando residentes...</div>
+    </div>
+    <div id="masivo-inf-estado" style="display:none;margin-top:14px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button onclick="document.getElementById('modal-envio-masivo-inf').style.display='none'" class="btn btn-outline">Cancelar</button>
+      <button onclick="enviarMasivoInformativo()" id="btn-enviar-masivo-inf"
         style="background:#6a1b9a;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">
         📤 Enviar a seleccionados
       </button>
