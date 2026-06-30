@@ -5149,7 +5149,7 @@ async function ejecutarImportacion(){
 window._editPlantillaId = null;
 
 function abrirCartaAviso(){
-  if(document.getElementById('modal-carta-aviso')){ document.getElementById('modal-carta-aviso').style.display='flex'; cargarPlantillasAviso(); return; }
+  if(document.getElementById('modal-carta-aviso')){ document.getElementById('modal-carta-aviso').style.display='flex'; cargarSelectorMotivos(); return; }
   const m=document.createElement('div');
   m.id='modal-carta-aviso';
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -5158,27 +5158,17 @@ function abrirCartaAviso(){
       <h3 style="color:#8e44ad;margin:0">📋 Carta de Aviso</h3>
       <button onclick="document.getElementById('modal-carta-aviso').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
     </div>
-    <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #eee">
-      <button onclick="switchTabAviso('redactar')" id="tab-redactar" style="padding:8px 16px;background:#8e44ad;color:white;border:none;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:600">✏️ Redactar carta</button>
-      <button onclick="switchTabAviso('plantillas')" id="tab-plantillas" style="padding:8px 16px;background:#f5f5f5;color:#666;border:none;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px">📁 Mis plantillas</button>
-    </div>
     <div id="panel-redactar">
       <div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tipo / Plantilla</label>
             <select id="ca-tipo" onchange="aplicarTextoAviso(this.value)" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-              <option value="ruido">Ruidos molestos</option>
-              <option value="estacionamiento">Estacionamiento indebido</option>
-              <option value="tenencia">Tenencia responsable mascotas</option>
-              <option value="reglamento">Incumplimiento reglamento</option>
-              <option value="juegos">Juegos espacios comunes</option>
-              <option value="multa_inasistencia">Multa inasistencia asamblea</option>
-              <option value="basura">Manejo inadecuado de basura</option>
-              <option value="daños">Daños a bienes comunes</option>
-              <option value="deuda">Deuda gastos comunes</option>
-              <option value="otro">Otro motivo (especificar abajo)</option>
+              <option value="">-- Selecciona un motivo --</option>
             </select>
-            <input id="ca-motivo-libre" placeholder="Describe el motivo (si elegiste Otro)" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;margin-top:6px;display:none"></div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input id="ca-nombre-nueva" placeholder="Nombre para guardar este motivo (ej: Estacionamiento indebido)" style="flex:1;padding:8px;border:1px solid var(--borde);border-radius:8px;font-size:12px">
+              <button type="button" onclick="guardarMotivoAviso()" style="background:#8e44ad;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;white-space:nowrap">💾 Guardar</button>
+            </div></div>
           <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° Carta</label>
             <input id="ca-numero" type="number" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
         </div>
@@ -5244,8 +5234,7 @@ function abrirCartaAviso(){
   </div>`;
   document.body.appendChild(m);
   document.getElementById('ca-fecha').value=new Date().toISOString().split('T')[0];
-  aplicarTextoAviso('ruido');
-  cargarPlantillasAviso();
+  cargarSelectorMotivos();
 }
 
 const _textosAviso = {
@@ -5257,34 +5246,84 @@ const _textosAviso = {
   multa_inasistencia:'Junto con saludarle, le informamos que su unidad no asistió a la Asamblea de Copropietarios ni presentó excusa válida ante la Administración.\n\nEn conformidad al Artículo Décimo Cuarto del Reglamento de Copropiedad, la inasistencia injustificada genera una multa de $10.000 (diez mil pesos), la cual ha sido cargada a su cuenta de gastos comunes.\n\nPara mayor información comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,'
 };
 
-function aplicarTextoAviso(tipo){
-  const t=document.getElementById('ca-cuerpo');
-  const selPlant=document.getElementById('selector-plantilla-aviso');
-  const campoLibre=document.getElementById('ca-motivo-libre');
-  if(!t) return;
-  if(campoLibre) campoLibre.style.display = tipo==='otro' ? 'block' : 'none';
-  if(tipo==='personalizado'){ if(selPlant) selPlant.style.display='block'; cargarSelectPlantillas(); }
-  else { if(selPlant) selPlant.style.display='none'; t.value=_textosAviso[tipo]||''; }
-}
-function cargarSelectPlantillas(){
-  db.collection('plantillas_aviso').orderBy('nombre').get().then(snap=>{
-    const sel=document.getElementById('ca-plantilla-sel'); if(!sel) return;
-    sel.innerHTML='<option value="">-- Selecciona una plantilla --</option>';
-    snap.forEach(d=>{ const p=d.data(); sel.innerHTML+=`<option value="${d.id}">${p.nombre||'Sin nombre'}</option>`; });
+const _motivosBase = {
+  'Ruidos molestos': 'Junto con saludarle, vengo en señalar que existen reclamos por ruidos molestos en las dependencias de su unidad.\n\nDe conformidad a nuestro reglamento interno en su artículo Décimo, no se podrá ejecutar acto alguno ya sea gritos o cualquier ruido molesto que perturbe la tranquilidad de los demás ocupantes del condominio. La música se debe escuchar siempre a un volumen moderado, todo lo anterior en concordancia con la Ley de Copropiedad Inmobiliaria 21.442.\n\nPor lo anterior, le solicitamos colaborar con la tranquilidad y buena convivencia al interior de nuestra comunidad. Al haber reincidencia se cursará una multa de 1 UTM.\n\nCualquier consulta comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  'Estacionamiento indebido': 'Junto con saludarle, vengo en señalar que existen reclamos de infracción por mal estacionamiento en reiteradas ocasiones.\n\nDe conformidad al Reglamento de Copropiedad, cada usuario sólo podrá ocupar el o los estacionamientos asignados a su propiedad. No podrá estacionarse en los pasajes del condominio ni en los lugares que no estén destinados a dicho uso. Todo lo anterior en concordancia con la Ley 21.442.\n\nPor lo anterior, le solicitamos colaborar con la buena convivencia. El comité administrativo está facultado para cursar una multa de 1 UTM al haber reincidencia.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  'Tenencia responsable mascotas': 'Junto con saludarle, vengo en representar la necesidad del debido cuidado y responsabilidad de su mascota, atendido a reclamos recibidos.\n\nEl artículo 23° de nuestro Reglamento dispone que los copropietarios pondrán especial cuidado en el traslado de sus mascotas por el interior del condominio. No está permitido que anden sueltos por las zonas comunes; deberán ser conducidos con cadena o correa.\n\nLe solicitamos respetar estas normas para resguardar la convivencia al interior del condominio.\n\nComuníquese a adm.lasaraucarias2020@gmail.com o al +56982187738\n\nSin otro particular saluda atentamente,',
+  'Incumplimiento reglamento': 'Junto con saludarle, se han recibido reclamos relacionados con el incumplimiento del Reglamento Interno del Condominio Las Araucarias.\n\nLe recordamos que todos los copropietarios, arrendatarios y ocupantes están obligados a respetar las normas del Reglamento de Copropiedad, en concordancia con la Ley N°21.442.\n\nLe solicitamos corregir la situación a la brevedad. De lo contrario el Comité Administrativo aplicará las sanciones establecidas en el Reglamento.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nSin otro particular saluda atentamente,',
+  'Juegos espacios comunes': 'Junto con saludarle, vengo en recordar que el uso de los espacios comunes del Condominio Las Araucarias debe realizarse conforme al Reglamento Interno.\n\nEl juego de niños en pasillos, estacionamientos y áreas no habilitadas genera riesgo para la seguridad de los residentes y provoca deterioro de las instalaciones.\n\nLe solicitamos orientar a sus hijos u otros ocupantes de la unidad para utilizar únicamente las áreas de juegos habilitadas.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  'Inasistencia asamblea': 'Junto con saludarle, le informamos que su unidad no asistió a la Asamblea de Copropietarios ni presentó excusa válida ante la Administración.\n\nEn conformidad al Artículo Décimo Cuarto del Reglamento de Copropiedad, la inasistencia injustificada genera una multa de $10.000 (diez mil pesos), la cual ha sido cargada a su cuenta de gastos comunes.\n\nPara mayor información comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  'Manejo inadecuado de basura': 'Junto con saludarle, vengo en señalar que se han recibido reclamos por manejo inadecuado de basura y residuos en su unidad.\n\nLe recordamos que los residuos deben depositarse en los contenedores habilitados, en los horarios establecidos por la administración, conforme al Reglamento Interno.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  'Daños a bienes comunes': 'Junto con saludarle, vengo en señalar que se han constatado daños a los bienes comunes del condominio atribuibles a su unidad.\n\nDe conformidad al Reglamento de Copropiedad, los costos de reparación serán de cargo del copropietario responsable.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,',
+  'Deuda gastos comunes': 'Junto con saludarle, le recordamos que su unidad mantiene una deuda pendiente por concepto de gastos comunes.\n\nLe solicitamos regularizar su situación a la brevedad para evitar el cobro de intereses y posibles acciones de cobranza, conforme a la Ley 21.442.\n\nComuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,'
+};
+
+function migrarMotivosBase(){
+  return db.collection('plantillas_aviso').get().then(snap=>{
+    if(!snap.empty) return; // ya hay datos, no migrar
+    const promesas = Object.entries(_motivosBase).map(([nombre,cuerpo])=>
+      db.collection('plantillas_aviso').add({nombre, cuerpo, actualizado:new Date().toISOString()})
+    );
+    return Promise.all(promesas);
   }).catch(()=>{});
 }
-function aplicarPlantillaGuardada(id){
-  if(!id) return;
+
+function cargarSelectorMotivos(){
+  const sel = document.getElementById('ca-tipo');
+  if(!sel) return;
+  migrarMotivosBase().then(()=>{
+    db.collection('plantillas_aviso').orderBy('nombre').get().then(snap=>{
+      sel.innerHTML = '<option value="">-- Selecciona un motivo --</option>';
+      snap.forEach(d=>{
+        const p = d.data();
+        sel.innerHTML += `<option value="${d.id}">${p.nombre||'Sin nombre'}</option>`;
+      });
+    }).catch(()=>{});
+  });
+}
+
+function aplicarTextoAviso(id){
+  const editor = document.getElementById('ca-cuerpo-editor');
+  const ta = document.getElementById('ca-cuerpo');
+  const nombreInput = document.getElementById('ca-nombre-nueva');
+  if(!id){ if(editor) editor.innerHTML=''; if(ta) ta.value=''; if(nombreInput) nombreInput.value=''; return; }
   db.collection('plantillas_aviso').doc(id).get().then(doc=>{
     if(doc.exists){
-      const cuerpo = doc.data().cuerpo||'';
-      const editor = document.getElementById('ca-cuerpo-editor');
-      const ta = document.getElementById('ca-cuerpo');
+      const p = doc.data();
+      const cuerpo = p.cuerpo||'';
       if(editor) editor.innerHTML = cuerpo;
       if(ta) ta.value = cuerpo;
+      if(nombreInput) nombreInput.value = p.nombre||'';
+      ta.dataset.plantillaId = doc.id;
     }
   });
 }
+
+function guardarMotivoAviso(){
+  sincronizarCuerpoAviso();
+  const cuerpo = document.getElementById('ca-cuerpo-editor')?.innerHTML?.trim();
+  const nombre = document.getElementById('ca-nombre-nueva')?.value?.trim();
+  if(!nombre){ alert('Escribe un nombre para este motivo (ej: Estacionamiento indebido)'); return; }
+  if(!cuerpo){ alert('Escribe el texto de la carta primero'); return; }
+
+  const ta = document.getElementById('ca-cuerpo');
+  const idExistente = ta?.dataset?.plantillaId;
+
+  const datos = { nombre: nombre, cuerpo: cuerpo, actualizado: new Date().toISOString() };
+
+  const promesa = idExistente
+    ? db.collection('plantillas_aviso').doc(idExistente).set(datos)
+    : db.collection('plantillas_aviso').add(datos);
+
+  promesa.then((ref)=>{
+    if(ref && ref.id && ta) ta.dataset.plantillaId = ref.id;
+    cargarSelectorMotivos();
+    alert('✅ Guardado: "' + nombre + '"');
+  }).catch(err=>{
+    alert('❌ Error al guardar: ' + err.message);
+  });
+}
+
 function switchTabAviso(tab){
   ['panel-redactar','panel-plantillas','panel-nueva-plantilla'].forEach(p=>{const el=document.getElementById(p);if(el)el.style.display='none';});
   ['tab-redactar','tab-plantillas'].forEach(t=>{const el=document.getElementById(t);if(el){el.style.background='#f5f5f5';el.style.color='#666';}});
