@@ -2266,11 +2266,15 @@ function enviarCorreoAviso() {
     return;
   }
 
-  // Limpiar HTML: quitar imágenes base64
+  // Extraer solo el body y limpiar imágenes base64
+  let htmlLimpio = _htmlCartaAviso;
+  const bodyMatch = htmlLimpio.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) htmlLimpio = bodyMatch[1];
   const tmp = document.createElement('div');
-  tmp.innerHTML = _htmlCartaAviso;
+  tmp.innerHTML = htmlLimpio;
   tmp.querySelectorAll('img').forEach(img => { if(img.src && img.src.startsWith('data:')) img.remove(); });
-  const cartaHtml = '<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;max-width:700px;margin:0 auto">' + tmp.innerHTML + '</div>';
+  // Estilos mínimos inline para el correo
+  const cartaHtml = '<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.9;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a">' + tmp.innerHTML + '</div>';
 
   btn.disabled = true;
   btn.textContent = '⏳ Enviando...';
