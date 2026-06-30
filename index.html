@@ -2225,8 +2225,18 @@ let _htmlCartaAviso = '';
 let _tipoCartaAviso = '';
 
 function prepararCorreoAviso(tipoLabel, campoUnidad, asunto) {
+  // Generar HTML si no existe aún (no obliga a imprimir primero)
   if (!_htmlCartaAviso) {
-    alert('Primero genera la carta con "Vista previa e imprimir" o "Generar e imprimir"');
+    if (tipoLabel === 'Carta de Aviso') {
+      generarCartaAviso2(true); // true = solo generar, no abrir ventana
+    } else if (tipoLabel === 'Citación a Asamblea') {
+      generarCitacion2(true);
+    } else if (tipoLabel === 'Notificación de Multa') {
+      generarNotifMulta(true);
+    }
+  }
+  if (!_htmlCartaAviso) {
+    alert('Completa los datos de la carta primero.');
     return;
   }
   const unidad = campoUnidad ? (document.getElementById(campoUnidad)?.value||'') : '';
@@ -5322,7 +5332,7 @@ function guardarComoPlantillaAviso(){
 
 
 
-function generarCartaAviso2(){
+function generarCartaAviso2(soloGenerar){
   const unidad=document.getElementById('ca-unidad')?.value||'';
   const nombre=document.getElementById('ca-nombre')?.value||'';
   const fechaRaw=document.getElementById('ca-fecha')?.value||new Date().toISOString().split('T')[0];
@@ -5375,11 +5385,13 @@ function generarCartaAviso2(){
   // Guardar HTML para envío por correo posterior
   _htmlCartaAviso = html;
   _tipoCartaAviso = 'Carta de Aviso';
-  // Abrir ventana para imprimir
-  const v=window.open('','_blank');
-  v.document.write(html);
-  v.document.close();
-  setTimeout(()=>v.print(),600);
+  // Abrir ventana para imprimir (solo si no es llamada silenciosa)
+  if (!soloGenerar) {
+    const v=window.open('','_blank');
+    v.document.write(html);
+    v.document.close();
+    setTimeout(()=>v.print(),600);
+  }
 }
 
 // ===== CITACION ASAMBLEA =====
@@ -5422,7 +5434,7 @@ function abrirCitacionAsamblea(){
   document.getElementById('cit-fasm').value=hoy;
 }
 
-function generarCitacion2(){
+function generarCitacion2(soloGenerar){
   const tipo=document.getElementById('cit-tipo').value;
   const [yc,mc,dc]=document.getElementById('cit-fcarta').value.split('-');
   const [ya,ma,da]=document.getElementById('cit-fasm').value.split('-');
@@ -5465,10 +5477,12 @@ function generarCitacion2(){
       </div>
     </div>
   </body></html>`;
-  const v=window.open('','_blank');
-  v.document.write(html);
-  v.document.close();
-  setTimeout(()=>v.print(),600);
+  if (!soloGenerar) {
+    const v=window.open('','_blank');
+    v.document.write(html);
+    v.document.close();
+    setTimeout(()=>v.print(),600);
+  }
   _htmlCartaAviso = html;
   _tipoCartaAviso = 'Citación a Asamblea';
 }
@@ -5510,7 +5524,7 @@ function abrirNotificacionMulta(){
   document.getElementById('nm-fecha').value=new Date().toISOString().split('T')[0];
 }
 
-function generarNotifMulta(){
+function generarNotifMulta(soloGenerar){
   const unidad=document.getElementById('nm-unidad')?.value||'';
   const nombre=document.getElementById('nm-nombre')?.value||'';
   const num=document.getElementById('nm-numero')?.value||'1';
@@ -5547,10 +5561,12 @@ function generarNotifMulta(){
       </div>
     </div>
   </body></html>`;
-  const v=window.open('','_blank');
-  v.document.write(html);
-  v.document.close();
-  setTimeout(()=>v.print(),600);
+  if (!soloGenerar) {
+    const v=window.open('','_blank');
+    v.document.write(html);
+    v.document.close();
+    setTimeout(()=>v.print(),600);
+  }
   _htmlCartaAviso = html;
   _tipoCartaAviso = 'Notificación de Multa';
 }
