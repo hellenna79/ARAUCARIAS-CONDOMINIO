@@ -2324,6 +2324,10 @@ function formatoAviso(cmd) {
   document.getElementById('ca-cuerpo-editor').focus();
   document.execCommand(cmd, false, null);
 }
+function formatoEditor(editorId, cmd) {
+  document.getElementById(editorId).focus();
+  document.execCommand(cmd, false, null);
+}
 function sincronizarCuerpoAviso() {
   const editor = document.getElementById('ca-cuerpo-editor');
   if (editor) {
@@ -5418,9 +5422,33 @@ function abrirCitacionAsamblea(){
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Lugar</label>
         <input id="cit-lugar" value="sala multiuso ubicada en Sargento Aldea 67, La Cruz" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Puntos a tratar (uno por línea)</label>
-        <textarea id="cit-puntos" rows="4" placeholder="Ej:\nAprobación presupuesto\nElección comité\nVarios" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical"></textarea></div>
+        <div style="border:1px solid var(--borde);border-radius:8px;overflow:hidden">
+            <div style="background:#f5f5f5;padding:6px 10px;border-bottom:1px solid var(--borde);display:flex;gap:4px">
+              <button type="button" onclick="formatoEditor('cit-puntos-editor','bold')" title="Negrita"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;font-size:13px">B</button>
+              <button type="button" onclick="formatoEditor('cit-puntos-editor','italic')" title="Cursiva"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-style:italic;font-size:13px">I</button>
+              <button type="button" onclick="formatoEditor('cit-puntos-editor','underline')" title="Subrayado"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;text-decoration:underline;font-size:13px">U</button>
+            </div>
+            <div id="cit-puntos-editor" contenteditable="true"
+              style="min-height:120px;padding:10px;font-size:13px;line-height:1.6;outline:none;white-space:pre-wrap"></div>
+            <textarea id="cit-puntos" style="display:none"></textarea>
+          </div></div>
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Observaciones adicionales (editable)</label>
-        <textarea id="cit-obs" rows="4" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical">IMPORTANTE: RECORDAR QUE LA INASISTENCIA SIN JUSTIFICACION A LA ASAMBLEA, SE CURSARA UNA MULTA DE $10.000 ESTABLECIDA EN EL ARTICULO DECIMO CUARTO DEL REGLAMENTO DE COPROPIEDAD DEL CONDOMINIO.</textarea></div>
+        <div style="border:1px solid var(--borde);border-radius:8px;overflow:hidden">
+            <div style="background:#f5f5f5;padding:6px 10px;border-bottom:1px solid var(--borde);display:flex;gap:4px">
+              <button type="button" onclick="formatoEditor('cit-obs-editor','bold')" title="Negrita"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;font-size:13px">B</button>
+              <button type="button" onclick="formatoEditor('cit-obs-editor','italic')" title="Cursiva"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-style:italic;font-size:13px">I</button>
+              <button type="button" onclick="formatoEditor('cit-obs-editor','underline')" title="Subrayado"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;text-decoration:underline;font-size:13px">U</button>
+            </div>
+            <div id="cit-obs-editor" contenteditable="true"
+              style="min-height:120px;padding:10px;font-size:13px;line-height:1.6;outline:none;white-space:pre-wrap">IMPORTANTE: RECORDAR QUE LA INASISTENCIA SIN JUSTIFICACION A LA ASAMBLEA, SE CURSARA UNA MULTA DE $10.000 ESTABLECIDA EN EL ARTICULO DECIMO CUARTO DEL REGLAMENTO DE COPROPIEDAD DEL CONDOMINIO.</div>
+            <textarea id="cit-obs" style="display:none">IMPORTANTE: RECORDAR QUE LA INASISTENCIA SIN JUSTIFICACION A LA ASAMBLEA, SE CURSARA UNA MULTA DE $10.000 ESTABLECIDA EN EL ARTICULO DECIMO CUARTO DEL REGLAMENTO DE COPROPIEDAD DEL CONDOMINIO.</textarea>
+          </div></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
       <button class="btn btn-outline" onclick="document.getElementById('modal-citacion').style.display='none'">Cancelar</button>
@@ -5440,8 +5468,8 @@ function generarCitacion2(soloGenerar){
   const [ya,ma,da]=document.getElementById('cit-fasm').value.split('-');
   const hora=document.getElementById('cit-hora').value;
   const lugar=document.getElementById('cit-lugar').value;
-  const puntos=document.getElementById('cit-puntos').value;
-  const obs=document.getElementById('cit-obs').value;
+  const puntos=document.getElementById('cit-puntos-editor').innerHTML;
+  const obs=document.getElementById('cit-obs-editor').innerHTML;
   const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
   const dSem=dias[new Date(parseInt(ya),parseInt(ma)-1,parseInt(da)).getDay()];
@@ -5511,7 +5539,19 @@ function abrirNotificacionMulta(){
           <input id="nm-monto" type="number" placeholder="Ej: 68923" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px"></div>
       </div>
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Motivo (editable)</label>
-        <textarea id="nm-motivo" rows="7" style="width:100%;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical;line-height:1.6">Nos dirigimos a usted con el fin de notificarle la aplicación de una multa, en conformidad con lo establecido en asamblea de copropietarios.\n\n[Describa aquí los hechos que motivan la multa...]\n\nEs importante recordar que el cuidado y buen uso de los espacios comunes es una obligación de todos los copropietarios.\n\nPara consultas comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,</textarea></div>
+        <div style="border:1px solid var(--borde);border-radius:8px;overflow:hidden">
+            <div style="background:#f5f5f5;padding:6px 10px;border-bottom:1px solid var(--borde);display:flex;gap:4px">
+              <button type="button" onclick="formatoEditor('nm-motivo-editor','bold')" title="Negrita"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;font-size:13px">B</button>
+              <button type="button" onclick="formatoEditor('nm-motivo-editor','italic')" title="Cursiva"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;font-style:italic;font-size:13px">I</button>
+              <button type="button" onclick="formatoEditor('nm-motivo-editor','underline')" title="Subrayado"
+                style="background:white;border:1px solid #ccc;border-radius:4px;padding:3px 10px;cursor:pointer;text-decoration:underline;font-size:13px">U</button>
+            </div>
+            <div id="nm-motivo-editor" contenteditable="true"
+              style="min-height:120px;padding:10px;font-size:13px;line-height:1.6;outline:none;white-space:pre-wrap">Nos dirigimos a usted con el fin de notificarle la aplicación de una multa, en conformidad con lo establecido en asamblea de copropietarios.\n\n[Describa aquí los hechos que motivan la multa...]\n\nEs importante recordar que el cuidado y buen uso de los espacios comunes es una obligación de todos los copropietarios.\n\nPara consultas comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,</div>
+            <textarea id="nm-motivo" style="display:none">Nos dirigimos a usted con el fin de notificarle la aplicación de una multa, en conformidad con lo establecido en asamblea de copropietarios.\n\n[Describa aquí los hechos que motivan la multa...]\n\nEs importante recordar que el cuidado y buen uso de los espacios comunes es una obligación de todos los copropietarios.\n\nPara consultas comuníquese a adm.lasaraucarias2020@gmail.com\n\nLe saluda atentamente,</textarea>
+          </div></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
       <button class="btn btn-outline" onclick="document.getElementById('modal-nm').style.display='none'">Cancelar</button>
@@ -5530,7 +5570,7 @@ function generarNotifMulta(soloGenerar){
   const num=document.getElementById('nm-numero')?.value||'1';
   const [y,m,d]=document.getElementById('nm-fecha').value.split('-');
   const monto=parseInt(document.getElementById('nm-monto')?.value||0);
-  const motivo=document.getElementById('nm-motivo')?.value||'';
+  const motivo=document.getElementById('nm-motivo-editor')?.innerHTML||'';
   const mes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(m)-1];
   const html=`<!DOCTYPE html><html><head><title>Notificación Multa</title><style>
     body{font-family:Arial,sans-serif;font-size:13px;padding:60px;max-width:720px;margin:0 auto;line-height:1.9;color:#1a1a1a}
