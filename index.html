@@ -2224,6 +2224,22 @@ function enviarCartaCorreo() {
 let _htmlCartaAviso = '';
 let _tipoCartaAviso = '';
 
+function prepararCorreoAviso(tipoLabel, campoUnidad, asunto) {
+  if (!_htmlCartaAviso) {
+    alert('Primero genera la carta con "Vista previa e imprimir" o "Generar e imprimir"');
+    return;
+  }
+  const unidad = campoUnidad ? (document.getElementById(campoUnidad)?.value||'') : '';
+  if (unidad) {
+    db.collection('residentes').where('unidad','==',unidad).get().then(s=>{
+      const correo = (!s.empty) ? (s.docs[0].data().correo||s.docs[0].data().email||'') : '';
+      abrirCorreoAviso(tipoLabel, _htmlCartaAviso, correo, asunto);
+    }).catch(()=>{ abrirCorreoAviso(tipoLabel, _htmlCartaAviso, '', asunto); });
+  } else {
+    abrirCorreoAviso(tipoLabel, _htmlCartaAviso, '', asunto);
+  }
+}
+
 function abrirCorreoAviso(tipoLabel, htmlCarta, correoAuto, asuntoAuto) {
   _htmlCartaAviso = htmlCarta;
   _tipoCartaAviso = tipoLabel;
@@ -5163,6 +5179,7 @@ function abrirCartaAviso(){
       <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="document.getElementById('modal-carta-aviso').style.display='none'">Cancelar</button>
         <button class="btn btn-verde" onclick="generarCartaAviso2()">👁️ Vista previa e imprimir</button>
+        <button class="btn" style="background:#E65100;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="prepararCorreoAviso('Carta de Aviso','ca-unidad','Carta de Aviso - Condominio Las Araucarias')">📧 Enviar correo</button>
         <button class="btn" style="background:#16a085;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="guardarRegistroCarta('aviso')">💾 Registrar carta</button>
       </div>
     </div>
@@ -5325,22 +5342,14 @@ function generarCartaAviso2(){
       </div>
     </div>
   </body></html>`;
+  // Guardar HTML para envío por correo posterior
+  _htmlCartaAviso = html;
+  _tipoCartaAviso = 'Carta de Aviso';
   // Abrir ventana para imprimir
   const v=window.open('','_blank');
   v.document.write(html);
   v.document.close();
   setTimeout(()=>v.print(),600);
-  // Guardar HTML para envío por correo
-  const unidadAviso = document.getElementById('ca-unidad')?.value||'';
-  let correoResAviso = '';
-  if (unidadAviso) {
-    db.collection('residentes').where('unidad','==',unidadAviso).get().then(s=>{
-      if(!s.empty){ correoResAviso = s.docs[0].data().correo||s.docs[0].data().email||''; }
-      abrirCorreoAviso('Carta de Aviso', html, correoResAviso, 'Carta de Aviso - Condominio Las Araucarias');
-    }).catch(()=>{ abrirCorreoAviso('Carta de Aviso', html, '', 'Carta de Aviso - Condominio Las Araucarias'); });
-  } else {
-    abrirCorreoAviso('Carta de Aviso', html, '', 'Carta de Aviso - Condominio Las Araucarias');
-  }
 }
 
 // ===== CITACION ASAMBLEA =====
@@ -5374,6 +5383,7 @@ function abrirCitacionAsamblea(){
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
       <button class="btn btn-outline" onclick="document.getElementById('modal-citacion').style.display='none'">Cancelar</button>
       <button class="btn btn-verde" onclick="generarCitacion2()">🖨️ Generar e imprimir</button>
+      <button style="background:#E65100;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600" onclick="prepararCorreoAviso('Citación a Asamblea','','Citación a Asamblea - Condominio Las Araucarias')">📧 Enviar correo</button>
     </div>
   </div>`;
   document.body.appendChild(m);
@@ -5429,7 +5439,8 @@ function generarCitacion2(){
   v.document.write(html);
   v.document.close();
   setTimeout(()=>v.print(),600);
-  abrirCorreoAviso('Citación a Asamblea', html, '', 'Citación a Asamblea - Condominio Las Araucarias');
+  _htmlCartaAviso = html;
+  _tipoCartaAviso = 'Citación a Asamblea';
 }
 
 // ===== NOTIFICACION MULTA =====
@@ -5461,6 +5472,7 @@ function abrirNotificacionMulta(){
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
       <button class="btn btn-outline" onclick="document.getElementById('modal-nm').style.display='none'">Cancelar</button>
       <button class="btn btn-verde" onclick="generarNotifMulta()">🖨️ Generar e imprimir</button>
+      <button style="background:#E65100;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600" onclick="prepararCorreoAviso('Notificación de Multa','nm-unidad','Notificación de Multa - Condominio Las Araucarias')">📧 Enviar correo</button>
       <button class="btn" style="background:#16a085;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="guardarRegistroCarta('multa')">💾 Registrar carta</button>
     </div>
   </div>`;
@@ -5509,16 +5521,8 @@ function generarNotifMulta(){
   v.document.write(html);
   v.document.close();
   setTimeout(()=>v.print(),600);
-  const unidadMulta = document.getElementById('nm-unidad')?.value||'';
-  let correoMulta = '';
-  if (unidadMulta) {
-    db.collection('residentes').where('unidad','==',unidadMulta).get().then(s=>{
-      if(!s.empty){ correoMulta = s.docs[0].data().correo||s.docs[0].data().email||''; }
-      abrirCorreoAviso('Notificación de Multa', html, correoMulta, 'Notificación de Multa - Condominio Las Araucarias');
-    }).catch(()=>{ abrirCorreoAviso('Notificación de Multa', html, '', 'Notificación de Multa - Condominio Las Araucarias'); });
-  } else {
-    abrirCorreoAviso('Notificación de Multa', html, '', 'Notificación de Multa - Condominio Las Araucarias');
-  }
+  _htmlCartaAviso = html;
+  _tipoCartaAviso = 'Notificación de Multa';
 }
 
 // ===================== PUBLICACIONES: ENVIAR POR CORREO =====================
