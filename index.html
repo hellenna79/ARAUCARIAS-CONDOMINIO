@@ -1130,7 +1130,8 @@ function guardarNuevoPago() {
   g.abonos += monto;
 
   // 2. Guardar en Firestore
-  const datos = { unidad, monto, fecha, concepto, forma, tipo: 'Pago' };
+  const estado = document.getElementById('np-estado')?.value || 'acreditado';
+  const datos = { unidad, monto, fecha, concepto, forma, tipo: 'Pago', estado };
   db.collection('pagos').add(datos).then(() => {
     // Generar asiento contable automático
     generarAsientoContable('ingreso', {unidad, monto, fecha, concepto, forma});
@@ -1229,6 +1230,7 @@ function verHistorialUnidad(unidad) {
         '<th style="padding:8px;text-align:left">Fecha</th>' +
         '<th style="padding:8px;text-align:left">Concepto</th>' +
         '<th style="padding:8px;text-align:left">Forma</th>' +
+        '<th style="padding:8px;text-align:left">Estado</th>' +
         '<th style="padding:8px;text-align:right">Monto</th>' +
         '<th style="padding:8px">Acciones</th>' +
         '</tr></thead><tbody>';
@@ -1242,8 +1244,12 @@ function verHistorialUnidad(unidad) {
           '<td style="padding:8px">' + (p.fecha||'—') + '</td>' +
           '<td style="padding:8px">' + (p.concepto||'—') + '</td>' +
           '<td style="padding:8px"><span style="background:#e8f5ee;padding:2px 8px;border-radius:10px;font-size:11px">' + (p.forma||'—') + '</span></td>' +
+          '<td style="padding:8px">' + (p.estado==='pendiente' ? '<span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:10px;font-size:11px">⏳ Pendiente</span>' : '<span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:10px;font-size:11px">✅ Acreditado</span>') + '</td>' +
           '<td style="padding:8px;text-align:right;color:#16a34a;font-weight:600">$' + Number(p.monto||0).toLocaleString('es-CL') + '</td>' +
-          '<td style="padding:8px;text-align:center"><button onclick="eliminarPagoGasto(\'' + p.id + '\',\'' + unidad + '\',' + p.monto + ')" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px">\u2716</button></td>' +
+          '<td style="padding:8px;text-align:center;display:flex;gap:4px;justify-content:center">' +
+          (p.estado==='pendiente' ? '<button onclick="acreditarPago(\'' + p.id + '\',\'' + unidad + '\')" style="background:#d1fae5;color:#065f46;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px">✅ Acreditar</button>' : '') +
+          '<button onclick="eliminarPagoGasto(\'' + p.id + '\',\'' + unidad + '\',' + p.monto + ')" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px">✖</button>' +
+          '</td>' +
           '</tr>';
       });
       html += '</tbody></table>';
@@ -1339,6 +1345,10 @@ function mostrarGastos() {
             <option>Cheque</option>
             <option>Débito</option>
             <option>Ajuste/Compensación</option>
+          </select>
+          <select id="np-estado" style="padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="acreditado">✅ Acreditado (ya está en el banco)</option>
+            <option value="pendiente">⏳ Pendiente (pago en línea, aún no llega)</option>
           </select>
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
@@ -2664,6 +2674,16 @@ function enviarMasivoInformativo() {
   enviarSiguiente(0);
 }
 // ── FIN MÓDULO INFORMATIVOS ──────────────────────────────────────────────
+
+
+function acreditarPago(pagoId, unidad) {
+  if (!confirm('¿Marcar este pago como Acreditado (ya en el banco)?')) return;
+  db.collection('pagos').doc(pagoId).update({ estado: 'acreditado' })
+    .then(() => {
+      verHistorialUnidad(unidad);
+    })
+    .catch(e => alert('Error: ' + e.message));
+}
 
 function cerrarVisor() { document.getElementById('visor-carta').style.display='none'; }
 
