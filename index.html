@@ -1312,6 +1312,7 @@ function mostrarGastos() {
         <button id="btn-cerrar-mes" class="btn" style="background:#1a7a4a;color:white;${mesCerrado?'opacity:0.6':''}" onclick="cerrarMesGastos()" ${mesCerrado?'disabled':''}>
           ${mesCerrado ? '✅ Mes cerrado' : '🔒 Cerrar mes ' + MES_ACTUAL}
         </button>
+        <button class="btn" style="background:#7b1fa2;color:white;border:none" onclick="abrirGestionIntereses()">⚙️ Gestionar intereses</button>
         <button class="btn btn-outline" onclick="exportarGastosExcel()">📥 Exportar Excel</button>
         <button class="btn btn-verde" onclick="abrirModalNuevoPago()">+ Nuevo pago</button>
       <button class="btn" style="background:#0e6655;color:white;border:none" onclick="enviarCobroMasivo()">📧 Cobro a morosos</button>
@@ -2715,6 +2716,78 @@ function acreditarPago(pagoId, unidad) {
     })
     .catch(e => alert('Error: ' + e.message));
 }
+
+
+// ── GESTIÓN DE INTERESES ────────────────────────────────────────────────
+function abrirGestionIntereses() {
+  const lista = document.getElementById('lista-intereses-unidades');
+  const TASA_DIARIA = 0.001173;
+  const DIAS = 30;
+  let html = '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+  html += '<thead><tr style="background:#f3e5f5"><th style="padding:8px;text-align:left">✅</th><th style="padding:8px;text-align:left">Unidad</th><th style="padding:8px;text-align:left">Residente</th><th style="padding:8px;text-align:right">Capital</th><th style="padding:8px;text-align:right">Interés calculado</th></tr></thead><tbody>';
+
+  GASTOS_JUNIO_2026.forEach(g => {
+    const capital = g.capitalAtrasado || 0;
+    if (capital <= 0) return; // sin deuda, no aplica interés
+    const intCalc = Math.round(capital * TASA_DIARIA * DIAS);
+    const tieneInteres = g.intereses > 0;
+    html += `<tr style="border-bottom:1px solid #f0f0f0">
+      <td style="padding:8px"><input type="checkbox" class="chk-interes" data-unidad="${g.unidad}" ${tieneInteres ? 'checked' : ''}></td>
+      <td style="padding:8px;font-weight:700">${g.unidad}</td>
+      <td style="padding:8px">${g.residente}</td>
+      <td style="padding:8px;text-align:right">$${capital.toLocaleString('es-CL')}</td>
+      <td style="padding:8px;text-align:right;color:#7b1fa2;font-weight:600">$${intCalc.toLocaleString('es-CL')}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  lista.innerHTML = html;
+  document.getElementById('modal-gestion-intereses').style.display = 'flex';
+}
+
+function seleccionarTodosIntereses(valor) {
+  document.querySelectorAll('.chk-interes').forEach(chk => { chk.checked = valor; });
+}
+
+function aplicarGestionIntereses() {
+  const TASA_DIARIA = 0.001173;
+  const DIAS = 30;
+  const checks = document.querySelectorAll('.chk-interes');
+
+  checks.forEach(chk => {
+    const unidad = chk.dataset.unidad;
+    const g = GASTOS_JUNIO_2026.find(x => x.unidad === String(unidad));
+    if (!g) return;
+    if (chk.checked) {
+      // SÍ paga interés
+      const intCalc = Math.round(g.capitalAtrasado * TASA_DIARIA * DIAS);
+      g.intereses = intCalc;
+    } else {
+      // NO paga interés
+      g.intereses = 0;
+    }
+  });
+
+  // Guardar en Firestore (actualizar el mes cerrado)
+  const datosIntereses = {};
+  GASTOS_JUNIO_2026.forEach(g => {
+    datosIntereses[g.unidad] = { totalMes: g.totalMes, intereses: g.intereses };
+  });
+  db.collection('meses_cerrados').doc(MES_ACTUAL.replace(' ', '_')).update({
+    datosIntereses: datosIntereses
+  }).catch(() => {
+    db.collection('meses_cerrados').doc(MES_ACTUAL.replace(' ', '_')).set({
+      mes: MES_ACTUAL, cerrado: true,
+      fechaCierre: new Date().toISOString(),
+      datosIntereses: datosIntereses
+    });
+  });
+
+  renderGastosTabla();
+  document.getElementById('modal-gestion-intereses').style.display = 'none';
+  alert('✅ Intereses actualizados correctamente.');
+}
+// ── FIN GESTIÓN INTERESES ────────────────────────────────────────────────
 
 function cerrarVisor() { document.getElementById('visor-carta').style.display='none'; }
 
@@ -6377,6 +6450,28 @@ function cerrarModalEnviarCorreo() {
       <button onclick="enviarMasivoInformativo()" id="btn-enviar-masivo-inf"
         style="background:#6a1b9a;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">
         📤 Enviar a seleccionados
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GESTIÓN INTERESES -->
+<div id="modal-gestion-intereses" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:12px;width:600px;max-width:96vw;max-height:88vh;overflow-y:auto;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-weight:700;font-size:16px;color:#7b1fa2">⚙️ Gestionar intereses — Junio 2026</span>
+      <button onclick="document.getElementById('modal-gestion-intereses').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
+    </div>
+    <p style="font-size:13px;color:#555;margin-bottom:14px">Marca ✅ las unidades que <strong>SÍ</strong> deben pagar interés. Desmarca las que <strong>NO</strong> pagan. Luego aplica los cambios.</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button onclick="seleccionarTodosIntereses(true)" style="background:#7b1fa2;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">Marcar todos</button>
+      <button onclick="seleccionarTodosIntereses(false)" style="background:#888;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">Quitar todos</button>
+    </div>
+    <div id="lista-intereses-unidades" style="border:1px solid #eee;border-radius:8px;max-height:380px;overflow-y:auto"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button onclick="document.getElementById('modal-gestion-intereses').style.display='none'" class="btn btn-outline">Cancelar</button>
+      <button onclick="aplicarGestionIntereses()" style="background:#7b1fa2;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">
+        💾 Aplicar cambios
       </button>
     </div>
   </div>
