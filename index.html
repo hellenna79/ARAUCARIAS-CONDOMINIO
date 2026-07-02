@@ -957,7 +957,16 @@ function cerrarMesGastos() {
   renderGastosTabla();
   const btn = document.getElementById('btn-cerrar-mes');
   if (btn) { btn.textContent = '✅ Mes cerrado'; btn.disabled = true; btn.style.opacity = '0.6'; }
-  alert('✅ Mes ' + MES_ACTUAL + ' cerrado correctamente.\nLos abonos registrados en Recaudación se descontarán del Total Cobrado.');
+  // Guardar cierre permanente en Firestore
+  const datosIntereses = {};
+  GASTOS_JUNIO_2026.forEach(g => { datosIntereses[g.unidad] = { totalMes: g.totalMes, intereses: g.intereses }; });
+  db.collection('meses_cerrados').doc(MES_ACTUAL.replace(' ', '_')).set({
+    mes: MES_ACTUAL,
+    fechaCierre: new Date().toISOString(),
+    cerrado: true,
+    datosIntereses: datosIntereses
+  }).catch(()=>{});
+  alert('✅ Mes ' + MES_ACTUAL + ' cerrado correctamente y guardado.');
 }
 
 function sincronizarAbonosDesdeRecaudacion() {
@@ -1398,6 +1407,28 @@ function mostrarGastos() {
     </div>`;
   // Auto-sincronizar abonos desde Firestore al abrir el módulo
   sincronizarAbonosDesdeRecaudacion();
+  // Cargar estado de cierre del mes desde Firestore
+  cargarEstadoCierreMes();
+}
+
+function cargarEstadoCierreMes() {
+  db.collection('meses_cerrados').doc(MES_ACTUAL.replace(' ', '_')).get().then(doc => {
+    if (doc.exists && doc.data().cerrado) {
+      const datos = doc.data().datosIntereses || {};
+      // Aplicar totalMes e intereses guardados a cada unidad
+      GASTOS_JUNIO_2026.forEach(g => {
+        const d = datos[g.unidad];
+        if (d) {
+          g.totalMes = d.totalMes || g.prorrateo;
+          g.intereses = d.intereses || 0;
+        }
+      });
+      mesCerrado = true;
+      renderGastosTabla();
+      const btn = document.getElementById('btn-cerrar-mes');
+      if (btn) { btn.textContent = '✅ Mes cerrado'; btn.disabled = true; btn.style.opacity = '0.6'; }
+    }
+  }).catch(() => {});
 }
 
 function editarGasto(idx) {
