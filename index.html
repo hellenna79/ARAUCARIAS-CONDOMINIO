@@ -950,7 +950,8 @@ function cerrarMesGastos() {
       const intMes = Math.round(g.capitalAtrasado * TASA_DIARIA * DIAS);
       g.intereses = (g.intereses || 0) + intMes;
     }
-    g.capitalAtrasado = g.capitalAtrasado + g.totalMes;
+    // capitalAtrasado NO se modifica aquí — ya incluye meses anteriores
+    // totalMes representa el cargo del mes actual (se suma en la vista)
   });
   mesCerrado = true;
   renderGastosTabla();
@@ -2443,8 +2444,18 @@ function abrirInformativo() {
   document.getElementById('inf-cuerpo-editor').innerHTML = '';
   document.getElementById('inf-cuerpo').value = '';
   document.getElementById('inf-nombre-nueva').value = '';
-  document.getElementById('inf-numero-input').value = '';
   _htmlInformativo = '';
+
+  // Obtener próximo número correlativo
+  db.collection('informativos_contador').doc('contador').get().then(doc => {
+    const actual = doc.exists ? (doc.data().ultimo || 0) : 0;
+    _numeroInformativoActual = actual + 1;
+    document.getElementById('inf-numero-display').textContent = _numeroInformativoActual;
+  }).catch(()=>{
+    _numeroInformativoActual = 1;
+    document.getElementById('inf-numero-display').textContent = 1;
+  });
+
   cargarSelectorTemasInformativo();
 }
 
@@ -2507,7 +2518,7 @@ function generarInformativo2(soloGenerar) {
   const fechaRaw = document.getElementById('inf-fecha')?.value || new Date().toISOString().split('T')[0];
   const [y,m,d] = fechaRaw.split('-');
   const mes = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(m)-1];
-  const numero = document.getElementById('inf-numero-input')?.value || '?';
+  const numero = _numeroInformativoActual || 1;
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informativo</title>
   <style>
@@ -2549,7 +2560,7 @@ function generarInformativo2(soloGenerar) {
     v.document.write(html);
     v.document.close();
     setTimeout(()=>v.print(),600);
-    
+    guardarCorrelativoInformativo(numero);
   }
 }
 
@@ -2565,9 +2576,8 @@ function prepararCorreoInformativo() {
     generarInformativo2(true);
   }
   if (!_htmlInformativo) { alert('Completa el informativo primero.'); return; }
-  
-  const numeroActual = document.getElementById('inf-numero-input')?.value || '?';
-  abrirCorreoAviso('Informativo N° ' + numeroActual, _htmlInformativo, '', 'Informativo N° ' + numeroActual + ' - Condominio Las Araucarias');
+  guardarCorrelativoInformativo(_numeroInformativoActual);
+  abrirCorreoAviso('Informativo N° ' + _numeroInformativoActual, _htmlInformativo, '', 'Informativo N° ' + _numeroInformativoActual + ' - Condominio Las Araucarias');
 }
 
 // Envío masivo de informativo
@@ -2577,7 +2587,7 @@ function abrirEnvioMasivoInformativo() {
   }
   if (!_htmlInformativo) { alert('Completa el informativo primero.'); return; }
 
-  document.getElementById('modal-masivo-inf-titulo').textContent = '📨 Envío masivo - Informativo N° ' + (document.getElementById('inf-numero-input')?.value || '?');
+  document.getElementById('modal-masivo-inf-titulo').textContent = '📨 Envío masivo - Informativo N° ' + _numeroInformativoActual;
   document.getElementById('masivo-inf-estado').style.display = 'none';
   document.getElementById('modal-envio-masivo-inf').style.display = 'flex';
   const lista = document.getElementById('lista-residentes-masivo-inf');
@@ -2624,7 +2634,7 @@ function enviarMasivoInformativo() {
   tmp.innerHTML = htmlLimpio;
   tmp.querySelectorAll('img').forEach(img => { if(img.src && img.src.startsWith('data:')) img.remove(); });
   const cartaHtml = '<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.9;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a">' + tmp.innerHTML + '</div>';
-  const asunto = 'Informativo N° ' + (document.getElementById('inf-numero-input')?.value || '?') + ' - Condominio Las Araucarias';
+  const asunto = 'Informativo N° ' + _numeroInformativoActual + ' - Condominio Las Araucarias';
 
   btn.disabled = true;
   estado.style.display = 'block';
@@ -2633,7 +2643,7 @@ function enviarMasivoInformativo() {
 
   let enviados = 0, fallidos = 0;
   const total = checks.length;
-  
+  guardarCorrelativoInformativo(_numeroInformativoActual);
 
   function enviarSiguiente(i) {
     if (i >= total) {
@@ -6229,11 +6239,7 @@ function cerrarModalEnviarCorreo() {
 <!-- MODAL INFORMATIVO -->
 <div id="modal-informativo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center;padding:20px">
   <div style="background:white;border-radius:16px;padding:28px;width:680px;max-width:96vw;max-height:90vh;overflow-y:auto">
-    <h3 style="margin-bottom:16px;color:#1565C0">📢 Informativo</h3>
-    <div style="margin-bottom:4px">
-      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">N° de Informativo</label>
-      <input id="inf-numero-input" type="number" placeholder="Ej: 3" style="width:120px;padding:10px;border:1px solid var(--borde);border-radius:8px;font-size:13px">
-    </div>
+    <h3 style="margin-bottom:16px;color:#1565C0">📢 Informativo N° <span id="inf-numero-display">-</span></h3>
     <div style="display:flex;flex-direction:column;gap:12px">
       <div>
         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tema / Asunto</label>
