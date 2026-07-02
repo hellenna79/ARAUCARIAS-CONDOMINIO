@@ -5218,8 +5218,9 @@ function cargarConciliacion2() {
   Promise.all([
     db.collection('pagos').orderBy('fecha','asc').get(),
     db.collection('egresos').orderBy('fecha','asc').get(),
-    db.collection('conciliacion_config').doc(mesKey).get()
-  ]).then(([pSnap, eSnap, cfgSnap]) => {
+    db.collection('conciliacion_config').doc(mesKey).get(),
+    db.collection('conciliacion_traspasos').where('mes','==',`${anio}-${mm}`).get()
+  ]).then(([pSnap, eSnap, cfgSnap, tSnap]) => {
     const cfg = cfgSnap.exists ? cfgSnap.data() : {};
     const saldoIniB = Number(cfg.saldoBanco||0);
     const saldoIniC = Number(cfg.saldoCaja||0);
@@ -5245,6 +5246,25 @@ function cargarConciliacion2() {
       const m = Number(e.monto||0);
       if(esBanco(e.forma||e.formaPago||'')){ banco.push({f:e.fecha,desc:`Egreso - ${e.descripcion||e.categoria||''}`,ing:0,egr:m,id:d.id,col:'egresos'}); egrB+=m; }
       else { caja.push({f:e.fecha,desc:`Egreso efvo - ${e.descripcion||e.categoria||''}`,ing:0,egr:m,id:d.id,col:'egresos'}); egrC+=m; }
+    });
+
+    // Procesar traspasos desde conciliacion_traspasos
+    tSnap.forEach(d => {
+      const t = d.data();
+      if(!t.fecha||t.fecha<inicio||t.fecha>fin) return;
+      const m = Number(t.monto||0);
+      const desc = `Traspaso - ${t.descripcion||''}`;
+      if(t.desde==='banco') {
+        // Banco → Caja: egreso del banco, ingreso a caja
+        banco.push({f:t.fecha,desc,ing:0,egr:m,id:d.id,col:'conciliacion_traspasos'});
+        caja.push({f:t.fecha,desc,ing:m,egr:0,id:d.id,col:'conciliacion_traspasos'});
+        egrB+=m; ingC+=m;
+      } else {
+        // Caja → Banco: egreso de caja, ingreso al banco
+        caja.push({f:t.fecha,desc,ing:0,egr:m,id:d.id,col:'conciliacion_traspasos'});
+        banco.push({f:t.fecha,desc,ing:m,egr:0,id:d.id,col:'conciliacion_traspasos'});
+        egrC+=m; ingB+=m;
+      }
     });
 
     function renderT(movs, tbodyId, totalId) {
@@ -5325,12 +5345,15 @@ function registrarTraspaso(){
   const desc=document.getElementById('traspaso-desc').value||'Traspaso entre cuentas';
   const hoy=new Date().toISOString().split('T')[0];
   if(!monto){alert('Ingresa un monto');return;}
-  const egreso={fecha:hoy,descripcion:desc,monto:monto,categoria:'Traspaso',formaPago:desde==='banco'?'Transferencia':'Efectivo',tipo:'traspaso'};
-  const ingreso={fecha:hoy,concepto:desc,monto:monto,unidad:'',forma:desde==='banco'?'Efectivo':'Transferencia',tipo:'traspaso'};
-  Promise.all([
-    db.collection('egresos').add(egreso),
-    db.collection('pagos').add(ingreso)
-  ]).then(()=>{ alert('Traspaso registrado'); document.getElementById('traspaso-monto').value=''; cargarConciliacion2(); })
+  // Solo registrar en conciliacion_traspasos, NO en egresos ni pagos
+  // para no distorsionar el flujo de caja
+  const traspaso={
+    fecha:hoy, descripcion:desc, monto:monto,
+    desde:desde, tipo:'traspaso',
+    mes:hoy.substring(0,7)
+  };
+  db.collection('conciliacion_traspasos').add(traspaso)
+  .then(()=>{ alert('Traspaso registrado'); document.getElementById('traspaso-monto').value=''; document.getElementById('traspaso-desc').value=''; cargarConciliacion2(); })
   .catch(e=>alert('Error: '+e.message));
 }
 
