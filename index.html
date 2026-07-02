@@ -3260,7 +3260,8 @@ function mostrarFlujoCaja() {
       const p = d.data();
       if (!p.fecha) return;
       const esAjuste = (p.tipo==='Ajuste') || (p.forma||'').toLowerCase().includes('ajuste') || (p.forma||'').toLowerCase().includes('compensaci');
-      if (esAjuste) return;
+      const esTraspaso = (p.tipo==='traspaso') || (p.concepto||'').toLowerCase().includes('traspaso');
+      if (esAjuste || esTraspaso) return;
       const mes = p.fecha.slice(0,7);
       if (!meses[mes]) meses[mes] = {ingresos:0, egresos:0};
       // Si el mes tiene manual: sumar el manual + solo pagos con unidad real (no '—')
@@ -3276,8 +3277,9 @@ function mostrarFlujoCaja() {
     egresosSnap.forEach(d => {
       const e = d.data();
       if (!e.fecha || e.anulado) return;
-      // Ajuste/Compensación no mueve dinero real, solo afecta gastos comunes
+      // Excluir ajustes y traspasos del flujo de caja
       if((e.forma||'').toLowerCase().includes('ajuste')) return;
+      if((e.tipo||'')==='traspaso' || (e.categoria||'').toLowerCase()==='traspaso' || (e.descripcion||'').toLowerCase().includes('traspaso')) return;
       const mes = e.fecha.slice(0,7);
       if (!meses[mes]) meses[mes]={ingresos:0,egresos:0};
       meses[mes].egresos += Number(e.monto||0);
